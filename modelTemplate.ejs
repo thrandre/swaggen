@@ -1,0 +1,13 @@
+<% Object.keys(module.dependencies).forEach(function(dep) { -%>
+import { <%= module.dependencies[dep].map(d => d.exportedName).join(', ') %> } from "<%= helpers.fixPath(module.dependencies[dep][0].getRelativePath(".ts")) %>";
+<% }); -%>
+<% if(Object.keys(module.dependencies).length > 0) { -%>
+
+<% } -%>
+<% module.members.forEach(function(model) { -%>
+export interface <%= model.type.name %> {
+	<%_ model.properties.forEach(function(property) { _%>
+	<%= helpers.expandIdentifier(property.name, property.typeInfo) %>;
+	<%_ }); _%>
+}
+<% }); -%>

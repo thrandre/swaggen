@@ -1,0 +1,17 @@
+{
+    "version": "2.0",
+    "compilerOptions": {
+        "target": "es5",
+        "noImplicitAny": true,
+        "strictNullChecks": true,
+        "sourceMap": true,
+        "allowSyntheticDefaultImports": true,
+        "moduleResolution": "node",
+        "outDir": "../bin",
+        "module": "commonjs",
+        "declaration": true
+    },
+    "exclude": [
+        "node_modules"
+    ]
+}

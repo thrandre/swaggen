@@ -1,0 +1,13 @@
+import { Dictionary, Type, Model, Endpoint, Module, ModuleType, DependencyRecord, Unit } from "./types";
+import { ModelMetadata, EndpointMetadata, MethodMetadata } from "./metadata";
+export declare function getLookupFn(conversionMap: Dictionary<string[]>, models: ModelMetadata[], methods: MethodMetadata[]): (typeName: string) => Type;
+export declare function getTypeResolver(lookup: (typeName: string) => Type): (name: string) => Type;
+export declare function mapModels(models: ModelMetadata[], resolveType: (name: string) => Type): Model[];
+export declare function mapEndpoints(endpoints: EndpointMetadata[], resolveType: (name: string) => Type): Endpoint[];
+export declare function getModelTypes(model: Model): Type[];
+export declare function getEndpointTypes(endpoint: Endpoint): Type[];
+export declare function getDependencyResolver(getTypes: (entities: (Model | Endpoint)) => Type[]): (entity: Model | Endpoint, module: Module, modules: Module[]) => DependencyRecord[];
+export declare function getModuleCreator(resolveExports: (unit: Unit) => string[], getPath: (module: Module, ext: string) => string, moduleType: ModuleType): (name: string, units: Unit[]) => Module;
+export declare function resolveModuleDependencies(resolveDependencies: (unit: Unit, module: Module, modules: Module[]) => DependencyRecord[], module: Module, modules: Module[]): _.Dictionary<DependencyRecord[]>;
+export declare function groupModels(models: Model[]): Dictionary<Model[]>;
+export declare function groupEndpoints(endpoints: Endpoint[]): Dictionary<Endpoint[]>;
