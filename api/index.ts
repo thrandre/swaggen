@@ -1,0 +1,9 @@
+export { RecordId } from "./schemas/RecordId";
+export { ArtistName } from "./schemas/ArtistName";
+export { Artist } from "./schemas/Artist";
+export { RecordTitle } from "./schemas/RecordTitle";
+export { Year } from "./schemas/Year";
+export { Genre } from "./schemas/Genre";
+export { Record } from "./schemas/Record";
+export { apiRecordGet } from "./operations/ApiRecordGet";
+export { apiRecordByIdGet } from "./operations/ApiRecordByIdGet";

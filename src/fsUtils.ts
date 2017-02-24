@@ -2,7 +2,7 @@ import * as Fs from "fs";
 
 export function removeDirectory(path: string) {
     if (Fs.existsSync(path)) {
-        Fs.readdirSync(path).forEach((file, index) => {
+        Fs.readdirSync(path).forEach(file => {
             var curPath = path + "/" + file;
             if (Fs.lstatSync(curPath).isDirectory()) {
                 removeDirectory(curPath);
@@ -19,7 +19,7 @@ export function ensureDirectoryExists(path: string) {
         return;
     }
     
-    Fs.mkdirSync(path);
+    Fs.mkdirSync(path, );
 }
 
 export function ensureDirectoriesExists(...paths: string[]) {

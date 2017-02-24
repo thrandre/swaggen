@@ -1,0 +1,8 @@
+export function <%= helpers.getTypeName(operation) %>(<%= operation.parameters.map(p => helpers.expandParameter(p)).join(", ") %>): RequestInfo<<%= helpers.expandResponses(operation.responses).join(", ") %>> {
+    return {
+        url: <%= helpers.convertPath(operation.path) %>,
+        method: "<%= operation.method %>",
+        query: <%= helpers.getQuery(operation.parameters) %>,
+        data: <%= helpers.getData(operation.parameters) %>
+    };
+}

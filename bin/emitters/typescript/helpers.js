@@ -1,15 +1,12 @@
 "use strict";
-var utils_1 = require("../../utils");
-function expandIdentifier(identifier, typeInfo, required, shouldEscapeDots) {
-    if (required === void 0) { required = true; }
-    if (shouldEscapeDots === void 0) { shouldEscapeDots = true; }
-    return "" + (shouldEscapeDots ? escapeDots(identifier) : identifier) + (!required ? "?" : "") + ": " + expandTypeInfo(typeInfo);
-}
-exports.expandIdentifier = expandIdentifier;
-function expandTypeInfo(typeInfo) {
-    return "" + typeInfo.type.name + (typeInfo.isCollection ? "[]" : "");
-}
-exports.expandTypeInfo = expandTypeInfo;
+Object.defineProperty(exports, "__esModule", { value: true });
+const utils_1 = require("../../utils");
+/*export function expandIdentifier(identifier: string, typeInfo: TypeInfo, required: boolean = true, shouldEscapeDots: boolean = true) {
+    return `${ shouldEscapeDots ? escapeDots(identifier) : identifier }${ !required ? "?" : "" }: ${ expandTypeInfo(typeInfo) }`;
+}*/
+/*export function expandTypeInfo(typeInfo: TypeInfo) {
+    return `${ typeInfo.type.name }${typeInfo.isCollection ? "[]" : ""}`;
+}*/
 function escapeDots(identifier) {
     return identifier.replace(/\./g, "_");
 }
@@ -18,22 +15,14 @@ function ifNotNull(target, func) {
     return target && func(target);
 }
 exports.ifNotNull = ifNotNull;
-function createParameterHash(keys, shouldEscapeDots) {
-    if (shouldEscapeDots === void 0) { shouldEscapeDots = true; }
+function createParameterHash(keys, shouldEscapeDots = true) {
     return keys.length > 0
-        ? "{ " + keys.map(function (k) { return ("\"" + (escapeDots ? escapeDots(k) : k) + "\": " + k); }) + " }"
+        ? `{ ${keys.map(k => `"${shouldEscapeDots ? escapeDots(k) : k}": ${k}`)} }`
         : "{}";
 }
 exports.createParameterHash = createParameterHash;
-function formatUri(uri, shouldEscapeDots) {
-    if (shouldEscapeDots === void 0) { shouldEscapeDots = true; }
-    return "`" + uri.replace(/\{(.*?)\}/g, function (sub) {
-        var args = [];
-        for (var _i = 1; _i < arguments.length; _i++) {
-            args[_i - 1] = arguments[_i];
-        }
-        return "${ " + shouldEscapeDots ? escapeDots(args[0]) : args[0] + " }";
-    }) + "`";
+function formatUri(uri, shouldEscapeDots = true) {
+    return "`" + uri.replace(/\{(.*?)\}/g, (_, ...args) => "${ " + shouldEscapeDots ? escapeDots(args[0]) : args[0] + " }") + "`";
 }
 exports.formatUri = formatUri;
 function fixPath(path) {

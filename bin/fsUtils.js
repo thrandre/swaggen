@@ -1,8 +1,9 @@
 "use strict";
-var Fs = require("fs");
+Object.defineProperty(exports, "__esModule", { value: true });
+const Fs = require("fs");
 function removeDirectory(path) {
     if (Fs.existsSync(path)) {
-        Fs.readdirSync(path).forEach(function (file, index) {
+        Fs.readdirSync(path).forEach(file => {
             var curPath = path + "/" + file;
             if (Fs.lstatSync(curPath).isDirectory()) {
                 removeDirectory(curPath);
@@ -23,14 +24,10 @@ function ensureDirectoryExists(path) {
     Fs.mkdirSync(path);
 }
 exports.ensureDirectoryExists = ensureDirectoryExists;
-function ensureDirectoriesExists() {
-    var paths = [];
-    for (var _i = 0; _i < arguments.length; _i++) {
-        paths[_i - 0] = arguments[_i];
-    }
-    var slicedPaths = paths.slice();
-    slicedPaths.sort(function (a, b) { return a.length === b.length ? 0 : (b.length > a.length ? -1 : 1); });
-    slicedPaths.forEach(function (p) { return ensureDirectoryExists(p); });
+function ensureDirectoriesExists(...paths) {
+    const slicedPaths = paths.slice();
+    slicedPaths.sort((a, b) => a.length === b.length ? 0 : (b.length > a.length ? -1 : 1));
+    slicedPaths.forEach(p => ensureDirectoryExists(p));
 }
 exports.ensureDirectoriesExists = ensureDirectoriesExists;
 function writeFile(path, content) {

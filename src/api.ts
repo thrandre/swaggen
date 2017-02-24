@@ -1,20 +1,9 @@
-import * as Promise from "bluebird";
-import * as Req from "superagent";
+import Req from "axios";
+import { Document } from "./parsers/swagger";
 
-import { Response } from "./parsers/swagger";
-
-export function getSwaggerResponse(url: string): Promise<Response> {
-    return new Promise<Response>((resolve, reject) => {
-        Req.get(url, (err, res) => {
-            if(err) {
-                return reject(err);
-            }
-
-            if(!res || !res.body) {
-                return reject(res);
-            }
-
-            return resolve(res.body);
-        });
-    });
+export async function getSwaggerResponse(url: string): Promise<Document> {
+    return new Promise<Document>((resolve, reject) =>
+        Req.get(url)
+            .then(res =>  resolve(res.data))
+            .catch(err => reject(err)));
 }

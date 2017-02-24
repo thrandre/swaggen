@@ -1,142 +1,141 @@
 "use strict";
-var lodash_1 = require("lodash");
-var utils_1 = require("./utils");
-function getMethodFullName(method) {
-    return method.tags.join("_") + "_" + method.name;
-}
-function getTypeLookupTable(builtins, models, methods) {
-    return lodash_1.keyBy(builtins
-        .map(function (b) { return ({ id: b, name: b, builtin: true }); })
-        .concat(models.map(function (m) { return ({
-        id: lodash_1.uniqueId("model-"),
-        name: m.name,
-        builtin: false
-    }); }))
-        .concat(methods.map(function (m) { return ({
-        id: lodash_1.uniqueId("method-"),
-        name: getMethodFullName(m),
-        builtin: false
-    }); })), function (i) { return i.name; });
-}
-function invertMap(map) {
-    return lodash_1.flatMap(Object.keys(map), function (k) { return map[k].map(function (v) { return ({ key: k, val: v }); }); }).reduce(function (prev, next) {
-        prev[next.val] = next.key;
-        return prev;
-    }, {});
-}
-function getLookupFn(conversionMap, models, methods) {
-    var inverseMap = invertMap(conversionMap);
-    var table = getTypeLookupTable(Object.keys(conversionMap), models, methods);
-    return function (typeName) { return table[inverseMap[typeName.toLowerCase()] || typeName]; };
-}
-exports.getLookupFn = getLookupFn;
-function getTypeResolver(lookup) {
-    return function (name) {
-        var type = lookup(name);
-        if (!type) {
-            throw new Error("Unable to resolve type " + name);
-        }
-        return type;
-    };
-}
-exports.getTypeResolver = getTypeResolver;
-function getTypeInfo(type, isCollection) {
-    if (isCollection === void 0) { isCollection = false; }
+Object.defineProperty(exports, "__esModule", { value: true });
+const lodash_1 = require("lodash");
+const utils_1 = require("./utils");
+function createProperty(metadata, dependencyResolver) {
     return {
-        type: type,
-        isCollection: isCollection
+        kind: "property",
+        name: metadata.name,
+        isArray: metadata.typeReference.isArray,
+        type: dependencyResolver(metadata.typeReference.type.name)
     };
 }
-function mapModels(models, resolveType) {
-    return models.map(function (m) { return ({
-        type: resolveType(m.name),
-        properties: m.properties.map(function (p) { return ({
-            name: p.name,
-            typeInfo: getTypeInfo(resolveType(p.typeDescription.name), p.typeDescription.isCollection)
-        }); })
-    }); })
-        .filter(function (m) { return !m.type.builtin; });
+function createSchema(metadata, dependencyResolver) {
+    return {
+        kind: "schema",
+        name: metadata.name,
+        properties: metadata.properties.map(p => createProperty(p, dependencyResolver))
+    };
 }
-exports.mapModels = mapModels;
-function mapEndpoints(endpoints, resolveType) {
-    return endpoints.map(function (e) { return ({
-        uri: e.uri,
-        methods: e.methods.map(function (m) { return ({
-            type: resolveType(getMethodFullName(m)),
-            methodType: m.methodType,
-            tags: m.tags,
-            parameters: lodash_1.reverse(lodash_1.sortBy(m.parameters.map(function (p) { return ({
-                name: p.name,
-                parameterType: p.in,
-                required: p.required,
-                typeInfo: getTypeInfo(resolveType(p.typeDescription.name), p.typeDescription.isCollection)
-            }); }), function (p) { return p.required; })),
-            responses: m.responses.map(function (r) { return ({
-                code: r.code,
-                typeInfo: getTypeInfo(resolveType(r.typeDescription.name), r.typeDescription.isCollection)
-            }); })
-        }); })
-    }); });
+function createEnum(metadata, dependencyResolver) {
+    return {
+        kind: "enum",
+        name: metadata.name,
+        values: metadata.enum
+    };
 }
-exports.mapEndpoints = mapEndpoints;
-function getModelTypes(model) {
-    return model.properties.map(function (p) { return p.typeInfo.type; });
+function createAlias(metadata, dependencyResolver) {
+    return {
+        kind: "alias",
+        name: metadata.name,
+        type: dependencyResolver(metadata.type)
+    };
 }
-exports.getModelTypes = getModelTypes;
-function getEndpointTypes(endpoint) {
-    return lodash_1.flatMap(endpoint.methods, function (m) { return m.parameters
-        .map(function (p) { return p.typeInfo.type; })
-        .concat(m.responses.map(function (r) { return r.typeInfo.type; })); });
+function createParameter(metadata, dependencyResolver) {
+    return {
+        kind: "parameter",
+        name: metadata.name,
+        in: metadata.in,
+        required: metadata.required,
+        isArray: metadata.typeReference.isArray,
+        type: dependencyResolver(metadata.typeReference.type.name)
+    };
 }
-exports.getEndpointTypes = getEndpointTypes;
-function getDependencyResolver(getTypes) {
-    return function (entity, module, modules) { return getDependencies(getTypes(entity), module, modules); };
+function createOperation(metadata, dependencyResolver) {
+    return {
+        kind: "operation",
+        name: metadata.name,
+        path: metadata.path,
+        method: metadata.method,
+        tags: metadata.tags,
+        parameters: metadata.parameters.map(p => createParameter(p, dependencyResolver)),
+        responses: metadata.responses.map(r => createResponse(r, dependencyResolver))
+    };
 }
-exports.getDependencyResolver = getDependencyResolver;
-function getDependencies(types, module, modules) {
-    return lodash_1.uniq(types
-        .filter(function (t) { return !t.builtin && !module.exports.some(function (m) { return m === t.name; }); })
-        .map(function (t) {
-        var dep = lodash_1.find(modules, function (m) { return m.exports.some(function (e) { return e === t.name; }); });
-        if (!dep) {
-            throw new Error("Dependency " + t.name + " not found.");
+function createResponse(metadata, dependencyResolver) {
+    return {
+        kind: "response",
+        name: metadata.responseCode,
+        code: metadata.responseCode,
+        isArray: metadata.typeReference.isArray,
+        type: dependencyResolver(metadata.typeReference.type.name)
+    };
+}
+function createPrimitive(name) {
+    return { kind: "primitive", name };
+}
+function getModuleDependencies(module) {
+    if (module.getDependencies) {
+        return module.getDependencies();
+    }
+    return lodash_1.flatMap(module.types, t => {
+        switch (t.kind) {
+            case "operation":
+                return [...t.parameters.map(p => p.type), ...t.responses.map(p => p.type)];
+            case "schema":
+                return t.properties.map(p => p.type);
+            case "alias":
+                return [t.type];
+            default: return [];
         }
-        return {
-            exportedName: t.name,
-            moduleName: dep.name,
-            getRelativePath: function (ext, keepExt) {
-                if (keepExt === void 0) { keepExt = false; }
-                return utils_1.resolveRelativeModulePath(module, dep, ext, keepExt);
-            },
-            type: dep.type
-        };
-    }));
+    });
 }
-function getModuleCreator(resolveExports, getPath, moduleType) {
-    return function (name, units) {
-        var module = {
-            name: name,
-            type: moduleType,
-            members: units,
-            exports: lodash_1.flatMap(units, resolveExports),
-            getPath: null,
-            dependencies: []
-        };
-        module.getPath = function (ext) { return getPath(module, ext); };
-        return module;
-    };
+function createType(metadata, dependencyResolver) {
+    switch (metadata.kind) {
+        case "schema":
+            if (metadata.type === "object") {
+                return createSchema(metadata, dependencyResolver);
+            }
+            if (metadata.enum && metadata.enum.length > 0) {
+                return createEnum(metadata, dependencyResolver);
+            }
+            if (metadata.type) {
+                return createAlias(metadata, dependencyResolver);
+            }
+            return createPrimitive(metadata.name);
+        case "operation":
+            return createOperation(metadata, dependencyResolver);
+    }
 }
-exports.getModuleCreator = getModuleCreator;
-function resolveModuleDependencies(resolveDependencies, module, modules) {
-    return lodash_1.groupBy(lodash_1.uniqBy(lodash_1.flatMap(module.members, function (mm) { return resolveDependencies(mm, module, modules); }), function (d) { return d.exportedName; }), function (record) { return record.moduleName; });
+exports.createType = createType;
+function getResolver(pool) {
+    const validKinds = ["primitive", "alias", "enum", "schema"];
+    return name => utils_1.use(pool.find(n => n.name === name && validKinds.some(v => v === n.kind)))
+        .in(n => {
+        if (!n) {
+            throw new Error(`Unable to resolve type ${name}`);
+        }
+        return n;
+    });
+}
+exports.getResolver = getResolver;
+function getSchemaDependencies(metadata) {
+    return [
+        metadata.type,
+        ...metadata.properties.map(p => p.typeReference.type.name)
+    ];
+}
+exports.getSchemaDependencies = getSchemaDependencies;
+function getOperationDependencies(metadata) {
+    return [
+        ...metadata.parameters.map(p => p.typeReference.type.name),
+        ...metadata.responses.map(r => r.typeReference.type.name)
+    ];
+}
+exports.getOperationDependencies = getOperationDependencies;
+function resolveModuleDependencies(module, modules) {
+    const deps = getModuleDependencies(module)
+        .filter(t => t.kind !== "primitive" && !module.types.some(mt => mt === t))
+        .map(t => ({ type: t, module: utils_1.findOrThrow(modules, mt => mt.types.some(mtt => mtt === t)) }));
+    return utils_1.toMap(deps, i => i.module, i => i.type);
 }
 exports.resolveModuleDependencies = resolveModuleDependencies;
-function groupModels(models) {
-    return lodash_1.groupBy(models, function (m) { return m.type.name; });
+function createModule(name, ...types) {
+    return {
+        kind: "module",
+        name,
+        types
+    };
 }
-exports.groupModels = groupModels;
-function groupEndpoints(endpoints) {
-    return lodash_1.groupBy(endpoints, function (e) { return e.methods[0].tags[0]; });
-}
-exports.groupEndpoints = groupEndpoints;
+exports.createModule = createModule;
 //# sourceMappingURL=processing.js.map

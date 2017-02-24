@@ -1,114 +1,101 @@
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
-import {
-    Dictionary,
-    TypeLookupTable,
-    TypeInfo,
-    Type,
-    Model,
-    Method,
-    Endpoint,
-    Module,
-    ModuleType,
-    DependencyRecord,
-    Unit,
-    Emitter,
-    EmittedModule,
-    CliFlags
-} from "./types";
-
-import { ModelMetadata, EndpointMetadata } from "./metadata";
-import { getModels, getEndpoints } from "./parsers/swagger";
 import { getSwaggerResponse } from "./api";
+import { writeFile } from "./fsUtils";
+
+import { use, toLookup } from "./utils";
+import * as Swagger from './parsers/swagger';
+
+import { Emitter, CliFlags, Type } from "./types";
+import { Hash, resolvePath } from "./utils";
+
+import { resolve } from "./topoUtils";
+
+import { join, dirname } from "path";
+import * as mkdirp from 'mkdirp';
+
+import Emitters from "./emitters";
 
 import {
-    getTypeResolver,
-    getLookupFn,
-    mapModels,
-    mapEndpoints,
-    getModuleCreator,
-    groupModels,
-    groupEndpoints,
-    getDependencyResolver,
-    getModelTypes,
-    getEndpointTypes,
+    createModule,
+    createType,
+    getOperationDependencies,
+    getResolver,
+    getSchemaDependencies,
     resolveModuleDependencies
-} from "./processing";
+} from './processing';
 
-import { resolveRelativeModulePath, nixPath, resolvePath, resolveModulePath } from "./utils";
-import { ensureDirectoriesExists, writeFile } from "./fsUtils";
+const TOPO_ROOT_NODE = "_ROOT_";
 
-import { flatMap } from "lodash";
-
-function getIndexTypes(indexUnits: (Model | Method)[]) {
-    return () => flatMap(indexUnits, m => m.type);
+function outputModules(modules: [string, string][], basePath: string) {
+     modules.forEach(([path, content]) => {
+        mkdirp.sync(join(basePath, dirname(path)));
+        writeFile(join(basePath, path), content);
+    });
 }
 
-function getPathResolver(baseDir: string) {
-    return (module: Module, extension: string) => resolveModulePath(module, baseDir, extension);
+function getTypePool(entities: Swagger.EntityMetadata[]) {
+    return use(toLookup(entities, t => t.name))
+        .in(lookup => resolve({
+            root: TOPO_ROOT_NODE,
+            getChildrenFn: node => node !== TOPO_ROOT_NODE ?
+                use(lookup[node])
+                    .in(s => s ? (
+                        s.kind === "schema" ?
+                            getSchemaDependencies(s) :
+                            getOperationDependencies(s)
+                    ) : []):
+                Object.values(lookup).map(s => s.name),
+            resolveFn: (node, pool: Type[]) => use(lookup[node])
+                .in(s => createType(s || { name: node, kind: "schema" }, getResolver(pool)))
+        }));
 }
 
-function cleanOutput(output: string) {
-    return output.replace(/\r\n\s*\r\n/g, "\r\n");
-}
+async function start(emitter: Emitter, url: string, basePath: string) {
+    try {
+        const res = await getSwaggerResponse(url);
 
-function start(emitter: Emitter, url: string, basePath: string) {
-    getSwaggerResponse(url)
-        .catch(err => console.error(`Unable to contact swagger at: ${ url }`))
-        .then(res => {
-            const endpoints = getEndpoints(res);
-            const models = getModels(res);
+        if (!res) {
+            throw new Error(`Invalid response`);
+        }
 
-            const conversionMap: Dictionary<string[]> = {
-                "number": ["integer", "float", "double", "decimal"],
-                "string": ["string"],
-                "boolean": ["boolean", "bool"],
-                "any": ["object", "system.object"],
-                "void": ["void"]
-            };
+        const operations = Swagger.getOperations(res, "x-schema");
+        const schemas = Swagger.getSchemas(res, "x-schema");
 
-            const typeResolver = getTypeResolver(getLookupFn(conversionMap, models, flatMap(endpoints, e => e.methods)));
+        const typePool = getTypePool((schemas as Swagger.EntityMetadata[]).concat(operations));
+        
+        const modules = emitter.createModules(typePool, createModule);
+        const emittedModules = modules.map<[string, string]>(m => [
+            emitter.getModuleFilename(m),
+            emitter.emitModule(m, resolveModuleDependencies(m, modules))
+        ]);
 
-            const mappedModels = mapModels(models, typeResolver);
-            const mappedEndpoints = mapEndpoints(endpoints, typeResolver);
-
-            const pathResolver = getPathResolver(basePath);
-
-            const modelModuleCreator = getModuleCreator((m: Model) => [m.type.name], pathResolver, ModuleType.Model);
-            const endpointModuleCreator = getModuleCreator((e: Endpoint) => e.methods.map(m => m.type.name), pathResolver, ModuleType.Endpoint);
-
-            const modelGroups = groupModels(mappedModels);
-            const endpointGroups = groupEndpoints(mappedEndpoints);
-
-            const modelModules = Object.keys(modelGroups).map(name => modelModuleCreator(name, modelGroups[name]));
-            modelModules.forEach(m => m.dependencies = resolveModuleDependencies(getDependencyResolver(getModelTypes), m, modelModules));
-
-            const endpointModules = Object.keys(endpointGroups).map(name => endpointModuleCreator(name, endpointGroups[name]));
-            endpointModules.forEach(m => m.dependencies = resolveModuleDependencies(getDependencyResolver(getEndpointTypes), m, endpointModules.concat(modelModules)));
-
-            const modules = modelModules.concat(endpointModules);
-
-            ensureDirectoriesExists(basePath, basePath + "/models", basePath + "/endpoints");
-            emitter.onBeforeEmit(modules);
-
-            const output = emitter.emit(modules, basePath);
-
-            output.forEach(o => writeFile(o.path, o.content));
-        });
+        outputModules(emittedModules, basePath);
+    }
+    catch(err) {
+        console.log(err);
+        process.exit(1);
+    }
 }
 
 function getEmitter(path: string) {
     try {
-        return require(resolvePath(path));
+        const emitter = (Emitters as Hash<string>)[path];
+        return require(resolvePath(emitter || path, emitter ? __dirname : process.cwd()));
     }
-    catch(err) {
-        throw new Error(`Unable to resolve emitter "${ path }": ${ err }`);
+    catch (err) {
+        throw new Error(`Unable to resolve emitter "${path}": ${err}`);
     }
 }
 
-export function run(emitterPath: string, flags: CliFlags) {
-    if(!flags.url) {
+export function run(flags: CliFlags) {
+    if (!flags.url) {
         throw new Error(`Missing required parameter "url"`);
     }
-    start(getEmitter(emitterPath), flags.url, flags.basePath || "./api");
+
+    if(!flags.emitter) {
+        throw new Error(`No emitter specified. Try one of the following: ts`);
+    }
+
+    start(getEmitter(flags.emitter), flags.url, flags.basePath || "./api");
 }

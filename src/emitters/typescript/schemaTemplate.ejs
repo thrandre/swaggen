@@ -1,0 +1,5 @@
+export interface <%= schema.name %> {
+<% schema.properties.forEach(function(property) { -%>
+    <%= property.name %>: <%= helpers.getTypeName(property.type, property.isArray) -%>;
+<% }); -%>
+}

@@ -1,0 +1,29 @@
+{
+    "version": "2.0",
+    "compilerOptions": {
+        "target": "es2015",
+        "noImplicitAny": true,
+        "strictNullChecks": true,
+        "noImplicitReturns": true,
+        "noImplicitThis": true,
+        "noUnusedLocals": true,
+        "noFallthroughCasesInSwitch": true,
+        "sourceMap": true,
+        "allowSyntheticDefaultImports": true,
+        "moduleResolution": "node",
+        "outDir": "./bin",
+        "module": "commonjs",
+        "declaration": true,
+        "skipLibCheck": true,
+        "lib": [
+            "es2017"
+        ]
+    },
+    "exclude": [
+        "node_modules",
+        "./bin"
+    ],
+    "include": [
+        "./src/**/*"
+    ]
+}

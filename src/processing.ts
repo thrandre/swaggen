@@ -1,187 +1,172 @@
 import {
-    Dictionary,
-    TypeLookupTable,
-    TypeInfo,
+    Schema,
+    Property,
+    Parameter,
+    Operation,
+    TopLevelType,
+    DependencyResolver,
+    Enum,
+    Alias,
+    Response,
     Type,
-    Model,
-    Endpoint,
-    Module,
-    ModuleType,
-    DependencyRecord,
-    Unit
+    Primitive,
+    Module
 } from "./types";
 
-import { ModelMetadata, EndpointMetadata, MethodMetadata } from "./metadata";
-import { flatMap, groupBy, uniqueId, keyBy, invert, uniq, uniqBy, sortBy, reverse, find } from "lodash";
-import { resolveRelativeModulePath } from "./utils";
+import { flatMap } from "lodash";
+import { findOrThrow, use, toMap } from "./utils";
 
-function getMethodFullName(method: MethodMetadata) {
-    return `${ method.tags.join("_") }_${ method.name }`;
-}
+import * as Swagger from "./parsers/swagger";
 
-function getTypeLookupTable(builtins: string[], models: ModelMetadata[], methods: MethodMetadata[]): TypeLookupTable {
-    return keyBy(
-        builtins
-            .map(b => ({ id: b, name: b, builtin: true }))
-            .concat(
-                models.map(m => ({
-                    id: uniqueId("model-"),
-                    name: m.name,
-                    builtin: false
-                }))
-            )
-            .concat(
-                methods.map(m => ({
-                    id: uniqueId("method-"),
-                    name: getMethodFullName(m),
-                    builtin: false
-                }))
-            ),
-        i => i.name
-    )
-}
-
-function invertMap(map: Dictionary<string[]>): Dictionary<string> {
-    return flatMap(Object.keys(map), k => map[k].map(v => ({ key: k, val: v }))).reduce((prev: any, next: any) => {
-        prev[next.val] = next.key;
-        return prev;
-    }, {});
-}
-
-export function getLookupFn(conversionMap: Dictionary<string[]>, models: ModelMetadata[], methods: MethodMetadata[]) {
-    const inverseMap = invertMap(conversionMap);
-    const table = getTypeLookupTable(Object.keys(conversionMap), models, methods);
-
-    return (typeName: string) => table[inverseMap[typeName.toLowerCase()] || typeName];
-}
-
-export function getTypeResolver(lookup: (typeName: string) => Type) {
-    return (name: string) => {
-        const type = lookup(name);
-        if(!type) {
-            throw new Error(`Unable to resolve type ${ name }`);
-        }
-
-        return type;
-    };
-}
-
-function getTypeInfo(type: Type, isCollection: boolean = false): TypeInfo {
+function createProperty(metadata: Swagger.PropertyMetadata, dependencyResolver: DependencyResolver): Property {
     return {
-        type,
-        isCollection
+        kind: "property",
+        name: metadata.name,
+        isArray: metadata.typeReference.isArray,
+        type: dependencyResolver(metadata.typeReference.type.name)
     };
 }
 
-export function mapModels(models: ModelMetadata[], resolveType: (name: string) => Type): Model[] {
-    return models.map(m => ({
-        type: resolveType(m.name),
-        properties: m.properties.map(p => ({
-            name: p.name,
-            typeInfo: getTypeInfo(resolveType(p.typeDescription.name), p.typeDescription.isCollection)
-        }))
-    }))
-    .filter(m => !m.type.builtin);
+function createSchema(metadata: Swagger.SchemaMetadata, dependencyResolver: DependencyResolver): Schema {
+    return {
+        kind: "schema",
+        name: metadata.name,
+        properties: metadata.properties.map(p => createProperty(p, dependencyResolver))
+    };
 }
 
-export function mapEndpoints(endpoints: EndpointMetadata[], resolveType: (name: string) => Type): Endpoint[] {
-    return endpoints.map(e => ({
-        uri: e.uri,
-        methods: e.methods.map(m => ({
-            type: resolveType(getMethodFullName(m)),
-            methodType: m.methodType as any,
-            tags: m.tags,
-            parameters: reverse(sortBy(
-                m.parameters.map(p => ({
-                    name: p.name,
-                    parameterType: p.in as any,
-                    required: p.required,
-                    typeInfo: getTypeInfo(resolveType(p.typeDescription.name), p.typeDescription.isCollection)
-                })),
-                p => p.required
-            )),
-            responses: m.responses.map(r => ({
-                code: r.code,
-                typeInfo: getTypeInfo(resolveType(r.typeDescription.name), r.typeDescription.isCollection)
-            }))
-        }))
-    }));
+function createEnum(metadata: Swagger.SchemaMetadata, dependencyResolver: DependencyResolver): Enum {
+    return {
+        kind: "enum",
+        name: metadata.name,
+        values: metadata.enum
+    };
 }
 
-export function getModelTypes(model: Model) {
-    return model.properties.map(p => p.typeInfo.type);
+function createAlias(metadata: Swagger.SchemaMetadata, dependencyResolver: DependencyResolver): Alias {
+    return {
+        kind: "alias",
+        name: metadata.name,
+        type: dependencyResolver(metadata.type)
+    };
 }
 
-export function getEndpointTypes(endpoint: Endpoint) {
-    return flatMap(
-        endpoint.methods,
-        m => m.parameters
-            .map(p => p.typeInfo.type)
-            .concat(m.responses.map(r => r.typeInfo.type))
-    );
+function createParameter(metadata: Swagger.ParameterMetadata, dependencyResolver: DependencyResolver): Parameter {
+    return {
+        kind: "parameter",
+        name: metadata.name,
+        in: metadata.in,
+        required: metadata.required,
+        isArray: metadata.typeReference.isArray,
+        type: dependencyResolver(metadata.typeReference.type.name)
+    };
 }
 
-export function getDependencyResolver(getTypes: (entities: (Model | Endpoint)) => Type[]) {
-    return (entity: (Model | Endpoint), module: Module, modules: Module[]) => getDependencies(getTypes(entity), module, modules);
+function createOperation(metadata: Swagger.OperationMetadata, dependencyResolver: DependencyResolver): Operation {
+    return {
+        kind: "operation",
+        name: metadata.name,
+        path: metadata.path,
+        method: metadata.method,
+        tags: metadata.tags,
+        parameters: metadata.parameters.map(p => createParameter(p, dependencyResolver)),
+        responses: metadata.responses.map(r => createResponse(r, dependencyResolver))
+    };
 }
 
-function getDependencies(types: Type[], module: Module, modules: Module[]): DependencyRecord[]  {
-    return uniq(
+function createResponse(metadata: Swagger.ResponseMetadata, dependencyResolver: DependencyResolver): Response {
+    return {
+        kind: "response",
+        name: metadata.responseCode,
+        code: metadata.responseCode,
+        isArray: metadata.typeReference.isArray,
+        type: dependencyResolver(metadata.typeReference.type.name)
+    };
+}
+
+function createPrimitive(name: string): Primitive {
+    return { kind: "primitive", name };
+}
+
+function getModuleDependencies(module: Module): Type[] {
+    if(module.getDependencies) {
+        return module.getDependencies();
+    }
+    
+    return flatMap(module.types, t => {
+        switch(t.kind) {
+            case "operation":
+                return [ ...t.parameters.map(p => p.type), ...t.responses.map(p => p.type) ];
+            case "schema":
+                return t.properties.map(p => p.type);
+            case "alias":
+                return [ t.type ];
+            default: return [];
+        }
+    });
+}
+
+export function createType(metadata: Swagger.EntityMetadata, dependencyResolver: DependencyResolver): Type {
+    switch(metadata.kind) {
+        case "schema":
+            if(metadata.type === "object") {
+                return createSchema(metadata, dependencyResolver);
+            }
+
+            if(metadata.enum && metadata.enum.length > 0) {
+                return createEnum(metadata, dependencyResolver);
+            }
+
+            if(metadata.type) {
+                return createAlias(metadata, dependencyResolver);
+            }
+
+            return createPrimitive(metadata.name);
+        
+        case "operation":
+            return createOperation(metadata, dependencyResolver);
+    }
+}
+
+export function getResolver<T extends Type>(pool: T[]): (name: string) => TopLevelType {
+    const validKinds = [ "primitive", "alias", "enum", "schema" ];
+    
+    return name => use(pool.find(n => n.name === name && validKinds.some(v => v === n.kind)))
+        .in(n => {
+            if(!n) {
+                throw new Error(`Unable to resolve type ${name}`);
+            }
+
+            return n;
+        }) as TopLevelType;
+}
+
+export function getSchemaDependencies(metadata: Swagger.SchemaMetadata) {
+    return [ 
+        metadata.type,
+        ...metadata.properties.map(p => p.typeReference.type.name)
+    ];
+}
+
+export function getOperationDependencies(metadata: Swagger.OperationMetadata) {
+    return [
+        ...metadata.parameters.map(p => p.typeReference.type.name),
+        ...metadata.responses.map(r => r.typeReference.type.name)
+    ];
+}
+
+export function resolveModuleDependencies(module: Module, modules: Module[]) {
+    const deps = getModuleDependencies(module)
+        .filter(t => t.kind !== "primitive" && !module.types.some(mt => mt === t))
+        .map(t => ({ type: t, module: findOrThrow(modules, mt => mt.types.some(mtt => mtt === t)) }));
+
+    return toMap(deps, i => i.module, i => i.type);
+}
+
+export function createModule(name: string, ...types: Type[]): Module {
+    return {
+        kind: "module",
+        name,
         types
-            .filter(t => !t.builtin && !module.exports.some(m => m === t.name))
-            .map(t => {
-                const dep = find(modules, m => m.exports.some(e => e === t.name));
-                
-                if(!dep) {
-                    throw new Error(`Dependency ${ t.name } not found.`);
-                }
-
-                return {
-                    exportedName: t.name,
-                    moduleName: dep.name,
-                    getRelativePath: (ext: string, keepExt: boolean = false) => resolveRelativeModulePath(module, dep, ext, keepExt),
-                    type: dep.type
-                };
-            })
-    );
-}
-
-export function getModuleCreator(
-    resolveExports: (unit: Unit) => string[],
-    getPath: (module: Module, ext: string) => string,
-    moduleType: ModuleType
-): (name: string, units: Unit[]) => Module {
-    return (name: string, units: Unit[]) => {
-        const module = {
-            name,
-            type: moduleType,
-            members: units,
-            exports: flatMap(units, resolveExports),
-            getPath: null as any,
-            dependencies: [] as any
-        };
-
-        module.getPath = (ext: string) => getPath(module, ext);
-
-        return module;
     };
-}
-
-export function resolveModuleDependencies(
-    resolveDependencies: (unit: Unit, module: Module, modules: Module[]) => DependencyRecord[],
-    module: Module,
-    modules: Module[]
-) {
-    return groupBy(
-        uniqBy(flatMap(module.members, mm => resolveDependencies(mm, module, modules)), d => d.exportedName),
-        record => record.moduleName
-    );
-}
-
-export function groupModels(models: Model[]): Dictionary<Model[]> {
-    return groupBy(models, m => m.type.name);
-}
-
-export function groupEndpoints(endpoints: Endpoint[]): Dictionary<Endpoint[]> {
-    return groupBy(endpoints, e => e.methods[0].tags[0]);
 }

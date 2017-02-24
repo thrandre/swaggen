@@ -1,59 +1,210 @@
-import { join } from "path";
-import { compile, render } from "ejs";
-import { assign, last } from "lodash";
+import { Alias, Emitter, Enum, Module, Operation, Parameter, Response, Schema, TopLevelType, Type } from '../../types';
+import { readTemplate, resolveRelativePath } from "../../utils";
 
-import { Module, ModuleType, Endpoint, EndpointModule, ModelModule, EmittedModule } from "../../types";
+import { resolve } from "path";
+import { compile } from "ejs";
 
-import { readTemplate, nixPath } from "../../utils";
-import * as helpers from "./helpers";
+import * as Helpers from "../helpers";
 
-const modelTemplate = compile(readTemplate("./modelTemplate.ejs")) as any;
-const endpointTemplate = compile(readTemplate("./endpointTemplate.ejs")) as any;
+function getTemplate(name: string) {
+    return readTemplate(resolve(__dirname, name));
+}
 
-function emitModule(mod: Module) {
-    if (mod.type === ModuleType.Endpoint) {
-        return endpointTemplate(assign({}, { helpers }, { module: mod }));
+const dependencyDeclarationTemplate = compile(getTemplate("./dependencyTemplate.ejs"));
+const aliasTemplate = compile(getTemplate("./aliasTemplate.ejs"));
+const enumTemplate = compile(getTemplate("./enumTemplate.ejs"));
+const schemaTemplate = compile(getTemplate("./schemaTemplate.ejs"));
+const operationTemplate = compile(getTemplate("./operationTemplate.ejs"));
+const helperTemplate = compile(getTemplate("./helperTemplate.ejs"));
+const indexTemplate= compile(getTemplate("./indexTemplate.ejs"));
+
+function isTopLevelType(type: Type): type is TopLevelType {
+    return type.kind === "schema" || type.kind === "alias" || type.kind === "enum";
+}
+
+function isOperationType(type: Type): type is Operation {
+    return type.kind === "operation";
+}
+
+const primitiveMap = {
+    integer: "number",
+    number: "number",
+    string: "string",
+    boolean: "boolean"
+};
+
+function getTypeName(type: Type, isArray: boolean = false) {
+    if(type.kind === "operation") {
+        return Helpers.camelCase(type.name);
     }
-
-
-    return modelTemplate(assign({}, { helpers }, { module: mod }));
+    
+    return `${type.kind === "primitive" ? (primitiveMap as any)[type.name] : type.name}${isArray ? "[]" : ""}`;
 }
 
-function createModelIndex(modules: Module[], basePath: string) {
-    var indexPath = nixPath(join(basePath, 'models', 'index.ts'));
-
-    //console.log(modules.map(m => m.members.map(mm => mm.type.name).join('+') + " - " + utils.nixPath(utils.resolveRelativePath(indexPath, m.getPath(".ts"), ".ts"))));
-
-    return {
-        path: indexPath,
-        content: "Dette er en index"
-    };
+function expandParameter(parameter: Parameter) {
+    return `${parameter.name}${parameter.required ? "" : "?"}: ${getTypeName(parameter.type, parameter.isArray)}`;
 }
 
-function isEndpoint(module: Module): module is EndpointModule {
-    return module.type === ModuleType.Endpoint;
+function expandResponses(responses: Response[]) {
+    return [ getTypeName(responses[0].type, responses[0].isArray), "any" ];
 }
 
-export function onBeforeEmit(modules: Module[]) {
-    modules.forEach(m => {
-        if (isEndpoint(m)) {
-            m.members.forEach(mm => {
-                mm.methods.forEach(mmm => mmm.type.name = last(mmm.type.name.split('_')).toLowerCase())
-            })
+function getRelativeModulePath(fromModule: Module, toModule: Module) {
+    return resolveRelativePath(getModuleFilename(fromModule), getModuleFilename(toModule), ".ts");
+}
+
+function emitHelper(module: Module, dependencies: Map<Module, Type[]>) {
+    return helperTemplate({});
+}
+
+function emitIndex(module: Module, dependencies: Map<Module, Type[]>) {
+    return indexTemplate({
+        module,
+        dependencies,
+        helpers: {
+            ...Helpers,
+            getTypeName,
+            getRelativeModulePath
         }
     });
 }
 
-export function emit(modules: Module[], basePath: string): EmittedModule[] {
-    var modelIndex = createModelIndex(
-        modules.filter(m => m.type === 1),
-        basePath
-    );
-
-    return modules
-        .map(m => ({
-            path: m.getPath(".ts"),
-            content: emitModule(m)
-        }))
-        .concat([modelIndex]);
+function emitDependencyDeclarations(module: Module, dependencies: Map<Module, Type[]>) {
+    return dependencyDeclarationTemplate({
+        module,
+        dependencies,
+        helpers: {
+            ...Helpers,
+            getTypeName,
+            getRelativeModulePath
+        }
+    });
 }
+
+function emitAlias(alias: Alias) {
+    return aliasTemplate({
+        ...Helpers,
+        alias,
+        helpers: {
+            getTypeName
+        }
+    });
+}
+
+function emitEnum($enum: Enum) {
+    return enumTemplate({
+        $enum,
+        helpers: {
+            ...Helpers
+        }
+    });
+}
+
+function emitSchema(schema: Schema) {
+    return schemaTemplate({
+        schema,
+        helpers: {
+            ...Helpers,
+            getTypeName
+        }
+    });
+}
+
+function emitOperation(operation: Operation) {
+    return operationTemplate({
+        operation,
+        helpers: {
+            ...Helpers,
+            expandParameter,
+            expandResponses,
+            getTypeName,
+            convertPath(path: string) {
+                return "`" + path.replace(/\{/g, "${") + "`";
+            },
+            getQuery(parameters: Parameter[]) {
+                const query = parameters.filter(p => p.in === "query").reduce((p, n) => Object.assign({}, p, { [n.name]: n.name }), {});
+                return JSON.stringify(query);
+            },
+            getData(parameters: Parameter[]) {
+                return JSON.stringify(parameters.find(p => p.in === "body") || null);
+            }
+        }
+    });
+}
+
+function getModuleFilename(module: Module) {
+    if(module === HELPER_MODULE || module === INDEX_MODULE) {
+        return `${module.name}.ts`;
+    }
+
+    return `${isOperationType(module.types[0]) ? "operations" : "schemas"}/${module.name}.ts`;
+}
+
+const HELPER_MODULE: Module = {
+    kind: "module",
+    name: "helper",
+    types: [{ kind: "schema", name: "RequestInfo", properties: [] }]
+};
+
+const INDEX_MODULE: Module = {
+    kind: "module",
+    name: "index",
+    types: []
+};
+
+function createModules(types: Type[], createModule: (name: string, ...types: Type[]) => Module) {
+    INDEX_MODULE.getDependencies = () => types.filter(t => isTopLevelType(t) || isOperationType(t));
+
+    return [
+        ...(types as ReadonlyArray<Type>)
+            .filter(isTopLevelType)
+            .map(t => createModule(t.name, t)),
+        ...(types as ReadonlyArray<Type>)
+            .filter(isOperationType)
+            .map(t => createModule(t.name, t)),
+        HELPER_MODULE,
+        INDEX_MODULE
+    ];
+}
+
+function emitModule(module: Module, moduleDependencies: Map<Module, Type[]>) {
+    if(module.types.some(t => t.kind === "operation")) {
+        moduleDependencies.set(HELPER_MODULE, HELPER_MODULE.types);
+    }
+
+    if(module === HELPER_MODULE) {
+        return emitHelper(module, moduleDependencies);
+    }
+
+    if(module === INDEX_MODULE) {
+        return emitIndex(module, moduleDependencies);
+    }
+
+    return [
+        emitDependencyDeclarations(module, moduleDependencies),
+        ...module.types.map(t => {
+            switch(t.kind) {
+                case "alias":
+                    return emitAlias(t);
+                case "enum":
+                    return emitEnum(t);
+                case "schema":
+                    return emitSchema(t);
+                case "operation":
+                    return emitOperation(t);
+                
+                default: return "";
+            }
+        })
+    ]
+    .filter(s => !!s)
+    .join(Helpers.NEWLINE);
+}
+
+const api: Emitter = {
+    createModules,
+    getModuleFilename,
+    emitModule
+};
+
+export = api;

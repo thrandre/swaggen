@@ -1,7 +1,3 @@
 "use strict";
-(function (ModuleType) {
-    ModuleType[ModuleType["Endpoint"] = 0] = "Endpoint";
-    ModuleType[ModuleType["Model"] = 1] = "Model";
-})(exports.ModuleType || (exports.ModuleType = {}));
-var ModuleType = exports.ModuleType;
+Object.defineProperty(exports, "__esModule", { value: true });
 //# sourceMappingURL=types.js.map

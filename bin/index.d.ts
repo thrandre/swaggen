@@ -1,2 +1,2 @@
 import { CliFlags } from "./types";
-export declare function run(emitterPath: string, flags: CliFlags): void;
+export declare function run(flags: CliFlags): void;

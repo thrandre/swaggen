@@ -1,47 +1,161 @@
 "use strict";
-var path_1 = require("path");
-var ejs_1 = require("ejs");
-var lodash_1 = require("lodash");
-var types_1 = require("../../types");
-var utils_1 = require("../../utils");
-var helpers = require("./helpers");
-var modelTemplate = ejs_1.compile(utils_1.readTemplate("./modelTemplate.ejs"));
-var endpointTemplate = ejs_1.compile(utils_1.readTemplate("./endpointTemplate.ejs"));
-function emitModule(mod) {
-    if (mod.type === types_1.ModuleType.Endpoint) {
-        return endpointTemplate(lodash_1.assign({}, { helpers: helpers }, { module: mod }));
+const utils_1 = require("../../utils");
+const path_1 = require("path");
+const ejs_1 = require("ejs");
+const Helpers = require("../helpers");
+function getTemplate(name) {
+    return utils_1.readTemplate(path_1.resolve(__dirname, name));
+}
+const dependencyDeclarationTemplate = ejs_1.compile(getTemplate("./dependencyTemplate.ejs"));
+const aliasTemplate = ejs_1.compile(getTemplate("./aliasTemplate.ejs"));
+const enumTemplate = ejs_1.compile(getTemplate("./enumTemplate.ejs"));
+const schemaTemplate = ejs_1.compile(getTemplate("./schemaTemplate.ejs"));
+const operationTemplate = ejs_1.compile(getTemplate("./operationTemplate.ejs"));
+const helperTemplate = ejs_1.compile(getTemplate("./helperTemplate.ejs"));
+const indexTemplate = ejs_1.compile(getTemplate("./indexTemplate.ejs"));
+function isTopLevelType(type) {
+    return type.kind === "schema" || type.kind === "alias" || type.kind === "enum";
+}
+function isOperationType(type) {
+    return type.kind === "operation";
+}
+const primitiveMap = {
+    integer: "number",
+    number: "number",
+    string: "string",
+    boolean: "boolean"
+};
+function getTypeName(type, isArray = false) {
+    if (type.kind === "operation") {
+        return Helpers.camelCase(type.name);
     }
-    return modelTemplate(lodash_1.assign({}, { helpers: helpers }, { module: mod }));
+    return `${type.kind === "primitive" ? primitiveMap[type.name] : type.name}${isArray ? "[]" : ""}`;
 }
-function createModelIndex(modules, basePath) {
-    var indexPath = utils_1.nixPath(path_1.join(basePath, 'models', 'index.ts'));
-    //console.log(modules.map(m => m.members.map(mm => mm.type.name).join('+') + " - " + utils.nixPath(utils.resolveRelativePath(indexPath, m.getPath(".ts"), ".ts"))));
-    return {
-        path: indexPath,
-        content: "Dette er en index"
-    };
+function expandParameter(parameter) {
+    return `${parameter.name}${parameter.required ? "" : "?"}: ${getTypeName(parameter.type, parameter.isArray)}`;
 }
-function isEndpoint(module) {
-    return module.type === types_1.ModuleType.Endpoint;
+function expandResponses(responses) {
+    return [getTypeName(responses[0].type, responses[0].isArray), "any"];
 }
-function onBeforeEmit(modules) {
-    modules.forEach(function (m) {
-        if (isEndpoint(m)) {
-            m.members.forEach(function (mm) {
-                mm.methods.forEach(function (mmm) { return mmm.type.name = lodash_1.last(mmm.type.name.split('_')).toLowerCase(); });
-            });
-        }
+function getRelativeModulePath(fromModule, toModule) {
+    return utils_1.resolveRelativePath(getModuleFilename(fromModule), getModuleFilename(toModule), ".ts");
+}
+function emitHelper(module, dependencies) {
+    return helperTemplate({});
+}
+function emitIndex(module, dependencies) {
+    return indexTemplate({
+        module,
+        dependencies,
+        helpers: Object.assign({}, Helpers, { getTypeName,
+            getRelativeModulePath })
     });
 }
-exports.onBeforeEmit = onBeforeEmit;
-function emit(modules, basePath) {
-    var modelIndex = createModelIndex(modules.filter(function (m) { return m.type === 1; }), basePath);
-    return modules
-        .map(function (m) { return ({
-        path: m.getPath(".ts"),
-        content: emitModule(m)
-    }); })
-        .concat([modelIndex]);
+function emitDependencyDeclarations(module, dependencies) {
+    return dependencyDeclarationTemplate({
+        module,
+        dependencies,
+        helpers: Object.assign({}, Helpers, { getTypeName,
+            getRelativeModulePath })
+    });
 }
-exports.emit = emit;
+function emitAlias(alias) {
+    return aliasTemplate(Object.assign({}, Helpers, { alias, helpers: {
+            getTypeName
+        } }));
+}
+function emitEnum($enum) {
+    return enumTemplate({
+        $enum,
+        helpers: Object.assign({}, Helpers)
+    });
+}
+function emitSchema(schema) {
+    return schemaTemplate({
+        schema,
+        helpers: Object.assign({}, Helpers, { getTypeName })
+    });
+}
+function emitOperation(operation) {
+    return operationTemplate({
+        operation,
+        helpers: Object.assign({}, Helpers, { expandParameter,
+            expandResponses,
+            getTypeName,
+            convertPath(path) {
+                return "`" + path.replace(/\{/g, "${") + "`";
+            },
+            getQuery(parameters) {
+                const query = parameters.filter(p => p.in === "query").reduce((p, n) => Object.assign({}, p, { [n.name]: n.name }), {});
+                return JSON.stringify(query);
+            },
+            getData(parameters) {
+                return JSON.stringify(parameters.find(p => p.in === "body") || null);
+            } })
+    });
+}
+function getModuleFilename(module) {
+    if (module === HELPER_MODULE || module === INDEX_MODULE) {
+        return `${module.name}.ts`;
+    }
+    return `${isOperationType(module.types[0]) ? "operations" : "schemas"}/${module.name}.ts`;
+}
+const HELPER_MODULE = {
+    kind: "module",
+    name: "helper",
+    types: [{ kind: "schema", name: "RequestInfo", properties: [] }]
+};
+const INDEX_MODULE = {
+    kind: "module",
+    name: "index",
+    types: []
+};
+function createModules(types, createModule) {
+    INDEX_MODULE.getDependencies = () => types.filter(t => isTopLevelType(t) || isOperationType(t));
+    return [
+        ...types
+            .filter(isTopLevelType)
+            .map(t => createModule(t.name, t)),
+        ...types
+            .filter(isOperationType)
+            .map(t => createModule(t.name, t)),
+        HELPER_MODULE,
+        INDEX_MODULE
+    ];
+}
+function emitModule(module, moduleDependencies) {
+    if (module.types.some(t => t.kind === "operation")) {
+        moduleDependencies.set(HELPER_MODULE, HELPER_MODULE.types);
+    }
+    if (module === HELPER_MODULE) {
+        return emitHelper(module, moduleDependencies);
+    }
+    if (module === INDEX_MODULE) {
+        return emitIndex(module, moduleDependencies);
+    }
+    return [
+        emitDependencyDeclarations(module, moduleDependencies),
+        ...module.types.map(t => {
+            switch (t.kind) {
+                case "alias":
+                    return emitAlias(t);
+                case "enum":
+                    return emitEnum(t);
+                case "schema":
+                    return emitSchema(t);
+                case "operation":
+                    return emitOperation(t);
+                default: return "";
+            }
+        })
+    ]
+        .filter(s => !!s)
+        .join(Helpers.NEWLINE);
+}
+const api = {
+    createModules,
+    getModuleFilename,
+    emitModule
+};
+module.exports = api;
 //# sourceMappingURL=index.js.map

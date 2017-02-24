@@ -1,81 +1,63 @@
-export interface Dictionary<T> {
-    [key: string]: T;
-}
-export interface TypeInfo {
-    type: Type;
-    isCollection: boolean;
-}
-export interface Type {
-    id: string;
-    name: string;
-    builtin: boolean;
-}
-export interface TypeLookupTable extends Dictionary<Type> {
-}
-export interface ModelProperty {
-    name: string;
-    typeInfo: TypeInfo;
-}
-export interface Model {
-    type: Type;
-    properties: ModelProperty[];
-}
-export interface Endpoint {
-    uri: string;
-    methods: Method[];
-}
-export interface Method {
-    type: Type;
-    methodType: "get" | "post" | "put" | "delete";
-    tags: string[];
-    parameters: MethodParameter[];
-    responses: MethodResponse[];
-}
-export interface MethodParameter {
-    name: string;
-    parameterType: "query" | "body";
-    required: boolean;
-    typeInfo: TypeInfo;
-}
-export interface MethodResponse {
-    code: string;
-    typeInfo: TypeInfo;
-}
-export declare enum ModuleType {
-    Endpoint = 0,
-    Model = 1,
-}
-export interface Module {
-    name: string;
-    type: ModuleType;
-    members: Unit[];
-    exports: string[];
-    getPath: (ext: string) => string;
-    dependencies: Dictionary<DependencyRecord[]>;
-}
-export interface EndpointModule extends Module {
-    members: Endpoint[];
-}
-export interface ModelModule extends Module {
-    members: Model[];
-}
-export interface DependencyRecord {
-    exportedName: string;
-    moduleName: string;
-    type: ModuleType;
-    getRelativePath: (ext: string, keepExtension?: boolean) => string;
-}
-export declare type Unit = Model | Endpoint;
-export interface EmittedModule {
-    path: string;
-    content: string;
-}
-export interface Emitter {
-    emit: (modules: Module[], basePath: string) => EmittedModule[];
-    onBeforeEmit: (modules: Module[]) => void;
-}
+import * as Swagger from "./parsers/swagger";
 export interface CliFlags {
+    emitter: string;
     url: string;
     basePath: string;
     extension: string;
+}
+export interface IHaveName {
+    name: string;
+}
+export interface ICanBeArray {
+    isArray: boolean;
+}
+export interface IHaveContainingType {
+    type: Primitive | Alias | Enum | Schema;
+}
+export interface Property extends IHaveName, ICanBeArray, IHaveContainingType {
+    kind: "property";
+}
+export interface Primitive extends IHaveName {
+    kind: "primitive";
+}
+export interface Schema extends IHaveName {
+    kind: "schema";
+    properties: Property[];
+}
+export interface Alias extends IHaveName, IHaveContainingType {
+    kind: "alias";
+}
+export interface Enum extends IHaveName {
+    kind: "enum";
+    values: string[];
+}
+export interface Operation extends IHaveName {
+    kind: "operation";
+    path: string;
+    method: Swagger.HttpMethod;
+    tags: string[];
+    parameters: Parameter[];
+    responses: Response[];
+}
+export interface Parameter extends IHaveName, ICanBeArray, IHaveContainingType {
+    kind: "parameter";
+    in: Swagger.ParameterSource;
+    required: boolean;
+}
+export interface Response extends IHaveName, ICanBeArray, IHaveContainingType {
+    kind: "response";
+    code: string;
+}
+export interface Module extends IHaveName {
+    kind: "module";
+    types: Type[];
+    getDependencies?: () => Type[];
+}
+export declare type TopLevelType = Primitive | Schema | Enum | Alias;
+export declare type Type = TopLevelType | Module | Response | Operation | Property;
+export declare type DependencyResolver = (name: string) => TopLevelType;
+export interface Emitter {
+    createModules(types: Type[], createModule: (name: string, ...types: Type[]) => Module): Module[];
+    getModuleFilename(module: Module): string;
+    emitModule(module: Module, moduleDependencies: any): string;
 }
