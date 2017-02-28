@@ -1,5 +1,6 @@
 import { last, flatMap } from 'lodash';
 import { Hash, use } from "../utils";
+import { Extension } from "../types";
 
 export interface Document {
     swagger: string;
@@ -37,9 +38,36 @@ export interface OperationResponse {
 
 export type PropertySchema = SchemaReference;
 
+export type PrimitiveType = "string" | "integer" | "boolean" | "object" | "array";
+export type Format = "int32" | "int64" | "float" | "double" | "byte" | "binary" | "date" | "date-time" | "password";
 export type ParameterSource = "path" | "body" | "query";
-export type PrimitiveType = "string" | "integer" | "object" | "array";
 export type HttpMethod = "get" | "post" | "put" | "delete" | "patch";
+
+function asPrimitiveType(type: string): PrimitiveType {
+    switch(type) {
+        case "string": return type;
+        case "integer": return type;
+        case "boolean": return type;
+        case "object": return type;
+        case "array": return type;
+        default: throw new Error(`Unknown primitive type ${type}`);
+    }
+}
+
+function asFormat(format: string): Format {
+    switch(format) {
+        case "int32": return format;
+        case "int64": return format;
+        case "float": return format;
+        case "double": return format;
+        case "byte": return format;
+        case "binary": return format;
+        case "date": return format;
+        case "date-time": return format;
+        case "password": return format;
+        default: throw new Error(`Unknown format ${format}`);
+    }
+}
 
 function asParameterSource(source: string): ParameterSource {
     switch(source) {
@@ -47,16 +75,6 @@ function asParameterSource(source: string): ParameterSource {
         case "body": return source;
         case "query": return source;
         default: throw new Error(`Unknown parameter source ${source}`);
-    }
-}
-
-function asPrimitiveType(type: string): PrimitiveType {
-    switch(type) {
-        case "string": return type;
-        case "integer": return type;
-        case "object": return type;
-        case "array": return type;
-        default: throw new Error(`Unknown primitive type ${type}`);
     }
 }
 
@@ -82,6 +100,7 @@ export interface Schema {
     type: PrimitiveType;
     properties: Hash<PropertySchema>;
     enum?: string[];
+    required?: string[];
 }
 
 export interface SchemaReference {
@@ -138,6 +157,7 @@ export interface TypeReferenceMetadata {
 
 export interface PropertyMetadata {
     name: string;
+    required: boolean;
     typeReference: TypeReferenceMetadata;
 }
 
@@ -175,7 +195,71 @@ export interface PathMetadata extends IMetadata {
     operations: OperationMetadata[];
 }
 
-const VOID: TypeMetadata = { name: "void" };
+export const VOID: TypeMetadata = { name: "void" };
+export const STRING: TypeMetadata = { name: "string" };
+export const BYTE: TypeMetadata = { name: "byte" };
+export const BINARY: TypeMetadata = { name: "binary" };
+export const DATE: TypeMetadata = { name: "date" };
+export const DATETIME: TypeMetadata = { name: "datetime" };
+export const PASSWORD: TypeMetadata = { name: "password" };
+export const INTEGER: TypeMetadata = { name: "integer" };
+export const LONG: TypeMetadata = { name: "long" };
+export const FLOAT: TypeMetadata = { name: "float" };
+export const DOUBLE: TypeMetadata = { name: "double" };
+export const BOOLEAN: TypeMetadata = { name: "boolean" };
+export const OBJECT: TypeMetadata = { name: "object" };
+export const ARRAY: TypeMetadata = { name: "array" };
+
+export function getPrimitiveType(schemaReference: SchemaReference) {
+    switch(asPrimitiveType(schemaReference.type)) {
+        case "string":
+            if(schemaReference.format) {
+                switch(asFormat(schemaReference.format)) {
+                    case "byte":
+                        return BYTE;
+                    case "binary":
+                        return BINARY;
+                    case "date":
+                        return DATE;
+                    case "date-time":
+                        return DATETIME;
+                    case "password":
+                        return PASSWORD;
+                    default:
+                        throw new Error(`Unable to parse type ${schemaReference.type} with format ${schemaReference.format}`);
+                }
+            }
+            else {
+                return STRING;
+            }
+        case "integer":
+            if(schemaReference.format) {
+                switch(asFormat(schemaReference.format)) {
+                    case "int32":
+                        return INTEGER;
+                    case "int64":
+                        return LONG;
+                    case "float":
+                        return FLOAT;
+                    case "double":
+                        return DOUBLE;
+                    default:
+                        throw new Error(`Unable to parse type ${schemaReference.type} with format ${schemaReference.format}`);
+                }
+            }
+            else {
+                return INTEGER;
+            }
+        case "boolean":
+            return BOOLEAN;
+        case "object":
+            return OBJECT;
+        case "array":
+            return ARRAY;
+        default:
+            throw new Error(`Unable to parse type ${schemaReference.type}`);
+    }
+}
 
 export function getType(document: Document, schemaReference: SchemaReference): TypeMetadata {
     if(isArraySchemaReference(schemaReference)) {
@@ -188,9 +272,7 @@ export function getType(document: Document, schemaReference: SchemaReference): T
         };
     }
 
-    return {
-        name: schemaReference.type
-    };
+    return getPrimitiveType(schemaReference);
 }
 
 const VOID_REFERENCE: TypeReferenceMetadata = { type: VOID, isArray: false };
@@ -202,13 +284,15 @@ export function getTypeReference(document: Document, schemaReference: SchemaRefe
     };
 }
 
-export type ParseExtension = "x-schema";
+function getParameterSchema(parameter: OperationParameter, ...extensions: Extension[]) {
+    if(extensions.some(e => e === "x-schema")) {
+        return (parameter as any)["x-schema"] || parameter.schema || parameter;
+    }
 
-function xSchema(operationParameter: OperationParameter) {
-    return (operationParameter as any)["x-schema"] as SchemaReference;
+    return parameter.schema || parameter;
 }
 
-export function getSchemas(document: Document, ...parseExtensions: ParseExtension[]): SchemaMetadata[] {
+export function getSchemas(document: Document, ...parseExtensions: Extension[]): SchemaMetadata[] {
     return (Object.entries(document.definitions) as ReadonlyArray<[string, Schema | undefined]>)
         .filter((x: any): x is [string, Schema] => !!x[1])
         .map<SchemaMetadata>(([schemaName, schema]) => ({
@@ -218,13 +302,16 @@ export function getSchemas(document: Document, ...parseExtensions: ParseExtensio
             properties: Object.entries(schema.properties)
                 .map(([propertyName, property]) => ({
                     name: propertyName,
+                    required: schema.required ?
+                        schema.required.some(r => r === propertyName) :
+                        false,
                     typeReference: getTypeReference(document, property)
                 })),
             enum: schema.enum || []
         }));
 }
 
-export function getOperations(document: Document, ...parseExtensions: ParseExtension[]): OperationMetadata[] {
+export function getOperations(document: Document, ...parseExtensions: Extension[]): OperationMetadata[] {
     return flatMap(
         (Object.entries(document.paths) as ReadonlyArray<[string, Path | undefined]>)
             .filter((x: any): x is [string, Path] => !!x[1]),
@@ -244,9 +331,7 @@ export function getOperations(document: Document, ...parseExtensions: ParseExten
                             required: p.required,
                             typeReference: getTypeReference(
                                 document,
-                                (parseExtensions.some(e => e === "x-schema") ?
-                                    xSchema(p) :
-                                    p.schema) || p)
+                                getParameterSchema(p, ...parseExtensions))
                         })),
                     responses: (Object.entries(operation.responses) as ReadonlyArray<[string, OperationResponse | undefined]>)
                         .filter((x: any): x is [string, OperationResponse] => !!x[1])

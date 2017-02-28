@@ -1,3 +1,4 @@
+/* tslint:disable */
 export type HttpMethod = "get" | "post" | "put" | "delete" | "patch";
 
 export interface RequestInfo<TSuccess, TError> {
@@ -5,4 +6,53 @@ export interface RequestInfo<TSuccess, TError> {
     method: HttpMethod;
     query: {[key: string]: any};
     data?: any;
+    mapResponse?: (responseData: any) => TSuccess;
+    mapRequest?: (requestData: any) => any; 
+
+    // Suppress unused warnings
+    __DUMMY?: TSuccess | TError;
+}
+
+export namespace Mappers {
+    export function mapToDate(dateString: string) {
+        return new Date(dateString);
+    }
+
+    export function mapFromDate(date: Date) {
+        return date.toString();
+    }
+
+    export function pluckMapper(obj: any, pluckMap: any, mapFn: (t: any) => any): any {
+        return Object.assign(
+            {},
+            obj,
+            Object.keys(pluckMap)
+                .reduce(
+                    (prev, next) => {
+                        return Object.assign(
+                            {},
+                            prev,
+                            {
+                                [next]: pluckMap[next] ?
+                                    pluckMapper(obj[next], pluckMap[next], mapFn) :
+                                    mapFn(obj[next])
+                            }
+                        );
+                    },
+                    {}
+                )
+        );
+    }
+
+    export function mapFrom(target: any, pluckMap: any): any {
+        return Array.isArray(target) ?
+            target.map(t => pluckMapper(t, pluckMap, mapToDate)) :
+            pluckMapper(target, pluckMap, mapToDate);
+    }
+
+    export function mapTo(target: any, pluckMap: any): any {
+        return Array.isArray(target) ?
+            target.map(t => pluckMapper(t, pluckMap, mapFromDate)) :
+            pluckMapper(target, pluckMap, mapFromDate);
+    }
 }

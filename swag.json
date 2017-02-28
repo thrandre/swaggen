@@ -29,6 +29,33 @@
                         }
                     }
                 }
+            },
+            "post": {
+                "tags": [
+                    "Record"
+                ],
+                "operationId": "ApiRecordPost",
+                "consumes": [
+                    "application/json",
+                    "text/json",
+                    "application/json-patch+json"
+                ],
+                "produces": [],
+                "parameters": [
+                    {
+                        "name": "record",
+                        "in": "body",
+                        "required": false,
+                        "schema": {
+                            "$ref": "#/definitions/Record"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                }
             }
         },
         "/api/Record/{id}": {
@@ -68,6 +95,9 @@
     },
     "definitions": {
         "Record": {
+            "required": [
+                "title"
+            ],
             "type": "object",
             "properties": {
                 "id": {
@@ -87,6 +117,10 @@
                     "items": {
                         "$ref": "#/definitions/Genre"
                     }
+                },
+                "playedFirstTime": {
+                    "format": "date-time",
+                    "type": "string"
                 }
             }
         },
@@ -98,6 +132,9 @@
         "Artist": {
             "type": "object",
             "properties": {
+                "id": {
+                    "$ref": "#/definitions/ArtistId"
+                },
                 "name": {
                     "$ref": "#/definitions/ArtistName"
                 }
@@ -119,6 +156,11 @@
                 "MelodicDeathMetal"
             ],
             "type": "string",
+            "properties": {}
+        },
+        "ArtistId": {
+            "format": "int32",
+            "type": "integer",
             "properties": {}
         },
         "ArtistName": {

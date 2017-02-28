@@ -4,7 +4,7 @@ export type <%= $enum.name %> = <%- $enum.values.map(v => `"${v}"`).join(" | ") 
 export const <%= val %>: <%= $enum.name %> = "<%= val %>";
 <% }) -%>
 
-export const values = {
+export const <%= $enum.name %>Values = {
 <% $enum.values.forEach(function(val) { -%>
     <%= val %>,
 <% }) -%>

@@ -1,3 +1,4 @@
+/* tslint:disable */
 <% [...dependencies.entries()].forEach(function([foreignModule, types]) { -%>
 import { <%= types.map(t => helpers.getTypeName(t)).join(", ")  %> } from "<%= helpers.getRelativeModulePath(module, foreignModule) %>";
 <% }); -%>

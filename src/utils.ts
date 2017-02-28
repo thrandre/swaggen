@@ -87,7 +87,10 @@ export function toMap<TKey, TVal, TTVal>(target: TVal[], keySelector: (obj: TVal
         const val = (transformValue ? transformValue(o) : o) as TTVal;
         
         if(map.has(key)) {
-            (map.get(key) as TTVal[]).push(val);
+            const bucket = map.get(key) as TTVal[];
+            if(!bucket.includes(val)) {
+                bucket.push(val);
+            }
             return;
         }
 

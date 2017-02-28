@@ -22,6 +22,7 @@ function createProperty(metadata: Swagger.PropertyMetadata, dependencyResolver: 
     return {
         kind: "property",
         name: metadata.name,
+        required: metadata.required,
         isArray: metadata.typeReference.isArray,
         type: dependencyResolver(metadata.typeReference.type.name)
     };

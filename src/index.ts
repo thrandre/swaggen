@@ -6,7 +6,7 @@ import { writeFile } from "./fsUtils";
 import { use, toLookup } from "./utils";
 import * as Swagger from './parsers/swagger';
 
-import { Emitter, CliFlags, Type } from "./types";
+import { Emitter, CliFlags, Type, Extension } from "./types";
 import { Hash, resolvePath } from "./utils";
 
 import { resolve } from "./topoUtils";
@@ -51,7 +51,7 @@ function getTypePool(entities: Swagger.EntityMetadata[]) {
         }));
 }
 
-async function start(emitter: Emitter, url: string, basePath: string) {
+async function start(emitter: Emitter, url: string, basePath: string, extensions: Extension[]) {
     try {
         const res = await getSwaggerResponse(url);
 
@@ -59,21 +59,21 @@ async function start(emitter: Emitter, url: string, basePath: string) {
             throw new Error(`Invalid response`);
         }
 
-        const operations = Swagger.getOperations(res, "x-schema");
-        const schemas = Swagger.getSchemas(res, "x-schema");
+        const operations = Swagger.getOperations(res, ...extensions);
+        const schemas = Swagger.getSchemas(res, ...extensions);
 
         const typePool = getTypePool((schemas as Swagger.EntityMetadata[]).concat(operations));
         
         const modules = emitter.createModules(typePool, createModule);
         const emittedModules = modules.map<[string, string]>(m => [
             emitter.getModuleFilename(m),
-            emitter.emitModule(m, resolveModuleDependencies(m, modules))
+            emitter.emitModule(m, resolveModuleDependencies(m, modules), ...extensions)
         ]);
 
         outputModules(emittedModules, basePath);
     }
     catch(err) {
-        console.log(err);
+        console.error("Ohnoes! Something went wrong: ", err);
         process.exit(1);
     }
 }
@@ -97,5 +97,12 @@ export function run(flags: CliFlags) {
         throw new Error(`No emitter specified. Try one of the following: ts`);
     }
 
-    start(getEmitter(flags.emitter), flags.url, flags.basePath || "./api");
+    start(
+        getEmitter(flags.emitter),
+        flags.url,
+        flags.basePath || "./api",
+        flags.extensions ?
+            flags.extensions.split(",").map(e => e.trim()) as Extension[]:
+            []
+    );
 }

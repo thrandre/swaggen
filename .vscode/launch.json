@@ -18,7 +18,9 @@
                 "--emitter",
                 "ts",
                 "--url",
-                "http://localhost:5000/swagger/v1/swagger.json"
+                "http://localhost:5000/swagger/v1/swagger.json",
+                "--extensions",
+                "x-schema,x-primitive-mapping"
             ]
         }
     ]

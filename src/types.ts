@@ -4,7 +4,7 @@ export interface CliFlags {
     emitter: string;
     url: string;
     basePath: string;
-    extension: string;
+    extensions: string;
 }
 
 export interface IHaveName {
@@ -21,6 +21,7 @@ export interface IHaveContainingType {
 
 export interface Property extends IHaveName, ICanBeArray, IHaveContainingType {
     kind: "property";
+    required: boolean;
 }
 
 export interface Primitive extends IHaveName {
@@ -74,5 +75,7 @@ export type DependencyResolver = (name: string) => TopLevelType;
 export interface Emitter {
     createModules(types: Type[], createModule: (name: string, ...types: Type[]) => Module): Module[];
     getModuleFilename(module: Module): string;
-    emitModule(module: Module, moduleDependencies: any): string;
+    emitModule(module: Module, moduleDependencies: any, ...extensions: Extension[]): string;
 }
+
+export type Extension = "x-schema" | "x-primitive-mapping";
