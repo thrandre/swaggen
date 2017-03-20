@@ -1,9 +1,10 @@
+import { EmitterEntry } from './emitters';
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 import { getSwaggerResponse } from "./api";
 import { writeFile } from "./fsUtils";
 
-import { use, toLookup } from "./utils";
+import { Action1, createTimer, execTool, Fn1, getModuleHash, toLookup, use } from './utils';
 import * as Swagger from './parsers/swagger';
 
 import { Emitter, CliFlags, Type, Extension } from "./types";
@@ -11,8 +12,10 @@ import { Hash, resolvePath } from "./utils";
 
 import { resolve } from "./topoUtils";
 
-import { join, dirname } from "path";
+import { join, dirname, resolve as res } from "path";
 import * as mkdirp from 'mkdirp';
+
+import { execFile, execFileSync, spawn } from 'child_process';
 
 import Emitters from "./emitters";
 
@@ -27,10 +30,31 @@ import {
 
 const TOPO_ROOT_NODE = "_ROOT_";
 
-function outputModules(modules: [string, string][], basePath: string) {
+const MODULES: { [key: string]: string } = {};
+
+function outputModules(modules: [string, string][], basePath: string, postprocess: Fn1<string, string[]> | undefined, onEmit: Action1<string>) {
      modules.forEach(([path, content]) => {
+        const oldHash = MODULES[path];
+        const hash = getModuleHash(content);
+
+        if(oldHash) {
+            if(oldHash === hash) {
+                return;
+            }
+        }
+
+        MODULES[path] = hash;
+
+        const filename = join(basePath, path);
+
         mkdirp.sync(join(basePath, dirname(path)));
-        writeFile(join(basePath, path), content);
+        writeFile(filename, content);
+
+        if(postprocess) {
+            execTool(...postprocess(filename));
+        }
+
+        onEmit(path);
     });
 }
 
@@ -51,37 +75,52 @@ function getTypePool(entities: Swagger.EntityMetadata[]) {
         }));
 }
 
-async function start(emitter: Emitter, url: string, basePath: string, extensions: Extension[]) {
+async function loop(emitter: { emitter: Emitter, meta: EmitterEntry }, url: string, basePath: string, onEmit: Action1<string>, onError: Action1<any>) {
+    let res;
+
     try {
-        const res = await getSwaggerResponse(url);
-
-        if (!res) {
-            throw new Error(`Invalid response`);
-        }
-
-        const operations = Swagger.getOperations(res, ...extensions);
-        const schemas = Swagger.getSchemas(res, ...extensions);
-
-        const typePool = getTypePool((schemas as Swagger.EntityMetadata[]).concat(operations));
-        
-        const modules = emitter.createModules(typePool, createModule);
-        const emittedModules = modules.map<[string, string]>(m => [
-            emitter.getModuleFilename(m),
-            emitter.emitModule(m, resolveModuleDependencies(m, modules), ...extensions)
-        ]);
-
-        outputModules(emittedModules, basePath);
+        res = await getSwaggerResponse(url);
     }
     catch(err) {
-        console.error("Ohnoes! Something went wrong: ", err);
-        process.exit(1);
+        onError(`Unable to contact swagger at ${url}`);
+        return;
     }
+
+    const operations = Swagger.getOperations(res);
+    const schemas = Swagger.getSchemas(res);
+
+    const typePool = getTypePool((schemas as Swagger.EntityMetadata[]).concat(operations));
+    
+    const modules = emitter.emitter.createModules(typePool, createModule);
+    const emittedModules = modules.map<[string, string]>(m => [
+        emitter.emitter.getModuleFilename(m),
+        emitter.emitter.emitModule(m, resolveModuleDependencies(m, modules))
+    ]);
+
+    outputModules(emittedModules, basePath, emitter.meta.postprocess, onEmit);
+}
+
+function start(emitter: { emitter: Emitter, meta: EmitterEntry }, url: string, basePath: string) {
+    createTimer(
+        async () => {
+            await loop(
+                emitter,
+                url,
+                basePath,
+                name => console.log(`Emitted module: ${name}`),
+                (e: any) => console.error(e));
+        },
+        10000,
+        true);
 }
 
 function getEmitter(path: string) {
     try {
-        const emitter = (Emitters as Hash<string>)[path];
-        return require(resolvePath(emitter || path, emitter ? __dirname : process.cwd()));
+        const emitter = (Emitters as Hash<EmitterEntry>)[path];
+        return {
+            meta: emitter,
+            emitter: require(resolvePath((emitter && emitter.path) || path, emitter ? __dirname : process.cwd()))
+        };
     }
     catch (err) {
         throw new Error(`Unable to resolve emitter "${path}": ${err}`);
@@ -94,15 +133,14 @@ export function run(flags: CliFlags) {
     }
 
     if(!flags.emitter) {
-        throw new Error(`No emitter specified. Try one of the following: ts`);
+        throw new Error(`No emitter specified. Try one of the following: ts, elm`);
     }
 
+    const emitter = getEmitter(flags.emitter);
+
     start(
-        getEmitter(flags.emitter),
+        emitter,
         flags.url,
         flags.basePath || "./api",
-        flags.extensions ?
-            flags.extensions.split(",").map(e => e.trim()) as Extension[]:
-            []
     );
 }

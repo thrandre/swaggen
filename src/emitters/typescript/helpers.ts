@@ -4,8 +4,6 @@ export function escapeDots(identifier: string) {
     return identifier.replace(/\./g, "_");
 }
 
-
-
 export function createParameterHash(keys: string[], shouldEscapeDots: boolean = true) {
     return keys.length > 0
         ? `{ ${ keys.map(k => `"${ shouldEscapeDots ? escapeDots(k) : k }": ${ k }`) } }`

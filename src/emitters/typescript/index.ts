@@ -8,7 +8,6 @@ import {
     Property,
     Response,
     Schema,
-    TopLevelType,
     Type
 } from '../../types';
 import { readTemplate, resolveRelativePath } from "../../utils";
@@ -17,7 +16,7 @@ import { resolve } from "path";
 import { compile } from "ejs";
 
 import { use } from "../../utils";
-import { Extension } from "../../types";
+import { Extension, Utils } from "../../types";
 
 import { groupBy } from "lodash";
 
@@ -34,14 +33,6 @@ const schemaTemplate = compile(getTemplate("./schemaTemplate.ejs"));
 const operationTemplate = compile(getTemplate("./operationTemplate.ejs"));
 const helperTemplate = compile(getTemplate("./helperTemplate.ejs"));
 const indexTemplate = compile(getTemplate("./indexTemplate.ejs"));
-
-function isTopLevelType(type: Type): type is TopLevelType {
-    return type.kind === "schema" || type.kind === "alias" || type.kind === "enum";
-}
-
-function isOperationType(type: Type): type is Operation {
-    return type.kind === "operation";
-}
 
 const primitiveMap = {
     integer: "number",
@@ -62,7 +53,7 @@ const primitiveMappingMap = {
     datetime: "Date"
 };
 
-namespace Utils {
+namespace Utils2 {
     export function ifNotNull<TTarget, TResult>(target: TTarget, func: (target: TTarget) => TResult): TResult {
         return target && func(target);
     }
@@ -159,7 +150,7 @@ function emitIndex(module: Module, dependencies: Map<Module, Type[]>, ...extensi
         extensions,
         helpers: {
             ...Helpers,
-            ...Utils
+            ...Utils2
         }
     });
 }
@@ -171,7 +162,7 @@ function emitDependencyDeclarations(module: Module, dependencies: Map<Module, Ty
         extensions,
         helpers: {
             ...Helpers,
-            ...Utils
+            ...Utils2
         }
     });
 }
@@ -182,7 +173,7 @@ function emitAlias(alias: Alias, ...extensions: Extension[]) {
         extensions,
         helpers: {
             ...Helpers,
-            ...Utils
+            ...Utils2
         }
     });
 }
@@ -193,7 +184,7 @@ function emitEnum($enum: Enum, ...extensions: Extension[]) {
         extensions,
         helpers: {
             ...Helpers,
-            ...Utils
+            ...Utils2
         }
     });
 }
@@ -204,7 +195,7 @@ function emitSchema(schema: Schema, ...extensions: Extension[]) {
         extensions,
         helpers: {
             ...Helpers,
-            ...Utils
+            ...Utils2
         }
     });
 }
@@ -213,14 +204,14 @@ function emitOperation(operation: Operation, ...extensions: Extension[]) {
     return operationTemplate({
         operation,
         extensions,
-        shouldMap: Utils.shouldProvideMappers(...extensions),
-        shouldMapTo: Utils.shouldProvideMappers(...extensions) &&
-            Utils.shouldMap(Utils.ifNotNull(Utils.getBodyParameter(operation.parameters), (p: Parameter) => p.type)),
-        shouldMapFrom: Utils.shouldProvideMappers(...extensions) &&
-            Utils.shouldMap(operation.responses[0].type),
+        shouldMap: Utils2.shouldProvideMappers(...extensions),
+        shouldMapTo: Utils2.shouldProvideMappers(...extensions) &&
+            Utils2.shouldMap(Utils2.ifNotNull(Utils2.getBodyParameter(operation.parameters), (p: Parameter) => p.type)),
+        shouldMapFrom: Utils2.shouldProvideMappers(...extensions) &&
+            Utils2.shouldMap(operation.responses[0].type),
         helpers: {
             ...Helpers,
-            ...Utils
+            ...Utils2
         }
     });
 }
@@ -230,7 +221,7 @@ function getModuleFilename(module: Module) {
         return `${module.name}.ts`;
     }
 
-    return `${isOperationType(module.types[0]) ? "operations" : "schemas"}/${module.name}.ts`;
+    return `${Utils.isOperation(module.types[0]) ? "operations" : "schemas"}/${module.name}.ts`;
 }
 
 const HELPER_MODULE: Module = {
@@ -251,18 +242,18 @@ const INDEX_MODULE: Module = {
 function createModules(types: Type[], createModule: (name: string, ...types: Type[]) => Module) {
     return [
         ...(types as ReadonlyArray<Type>)
-            .filter(isTopLevelType)
+            .filter(Utils.isDataType)
             .map(t => createModule(t.name, t)),
         ...Object.values(
             groupBy(
                 (types as ReadonlyArray<Type>)
-                .filter(isOperationType), t => t.tags[0]
+                .filter(Utils.isOperation), t => t.tags[0]
             )
         )
         .map(t => createModule(t[0].tags[0], ...t)),
         HELPER_MODULE,
         use(INDEX_MODULE).in(m => {
-            m.getDependencies = () => types.filter(t => isTopLevelType(t) || isOperationType(t));
+            m.getDependencies = () => types.filter(t => Utils.isDataType(t) || Utils.isOperation(t));
             return m;
         })
     ];

@@ -1,0 +1,1 @@
+type alias <%= helpers.getTypeName(schema) %> = { <%= schema.properties.map(helpers.emitProperty).join(", ") %> }

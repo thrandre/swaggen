@@ -1,0 +1,12 @@
+<%= helpers.getTypeName(operation) %> : <%- helpers.emitTypeDefinitionForRequestBuilder(operation) %>
+<%= helpers.getTypeName(operation) %> <%= helpers.emitParameterList(operation.parameters) %> =
+    HttpBuilder.<%= operation.method %> <%- helpers.getInterpolatedUrl(operation.path) %>
+<% if(helpers.getSuccessResponse(operation.responses).type.name !== "void") { -%>
+        |> HttpBuilder.withExpect (Http.expectJson(<%- helpers.getDecoder(helpers.getSuccessResponse(operation.responses)) %>))
+<% } -%>
+<% if(helpers.getQueryParams(operation.parameters).length > 0) { -%>
+        |> HttpBuilder.withQueryParams [<%- helpers.emitQueryParams(operation.parameters) %>]
+<% } -%>
+<% if(helpers.getBodyParam(operation.parameters)) { -%>
+        |> HttpBuilder.withJsonBody (<%- helpers.getEncoder(helpers.getBodyParam(operation.parameters)) %> <%= helpers.getBodyParam(operation.parameters).name %>)
+<% } -%>

@@ -1,8 +1,8 @@
 Arguments: 
-  C:\Program Files\nodejs\node.exe C:\Program Files (x86)\Yarn\bin\yarn.js link
+  C:\Program Files\nodejs\node.exe C:\Program Files (x86)\Yarn\bin\yarn.js add elm-format
 
 PATH: 
-  C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\Program Files\Microsoft SQL Server\130\Tools\Binn\;C:\Program Files\dotnet\;C:\Program Files\nodejs\;C:\Program Files\Git\cmd;C:\Program Files (x86)\Yarn\bin;C:\Program Files\Microsoft SQL Server\120\Tools\Binn\;C:\Program Files (x86)\Microsoft SQL Server\Client SDK\ODBC\130\Tools\Binn\;C:\Program Files (x86)\Microsoft SQL Server\130\Tools\Binn\;C:\Program Files (x86)\Microsoft SQL Server\130\DTS\Binn\;C:\Program Files (x86)\Microsoft SQL Server\130\Tools\Binn\ManagementStudio\;C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\130\Tools\Binn\;C:\Program Files\Microsoft SQL Server\130\DTS\Binn\;C:\Program Files\Microsoft SQL Server\110\Tools\Binn\;C:\Users\Thomas\scoop\shims;C:\Users\Thomas\AppData\Local\Microsoft\WindowsApps;;C:\Program Files (x86)\Microsoft VS Code Insiders\bin;C:\Users\Thomas\AppData\Roaming\npm;C:\Users\Thomas\AppData\Local\Yarn\.bin
+  C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\Program Files\Microsoft SQL Server\130\Tools\Binn\;C:\Program Files\nodejs\;C:\Program Files\Git\cmd;C:\Program Files (x86)\Yarn\bin;C:\Program Files\Microsoft SQL Server\120\Tools\Binn\;C:\Program Files (x86)\Microsoft SQL Server\Client SDK\ODBC\130\Tools\Binn\;C:\Program Files (x86)\Microsoft SQL Server\130\Tools\Binn\;C:\Program Files (x86)\Microsoft SQL Server\130\DTS\Binn\;C:\Program Files (x86)\Microsoft SQL Server\130\Tools\Binn\ManagementStudio\;C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\130\Tools\Binn\;C:\Program Files\Microsoft SQL Server\130\DTS\Binn\;C:\Program Files\Microsoft SQL Server\110\Tools\Binn\;C:\WINDOWS\system32\config\systemprofile\.dnx\bin;C:\Program Files\Microsoft DNX\Dnvm\;C:\Program Files\dotnet\;C:\Program Files (x86)\Elm Platform\0.18\bin;C:\Users\Thomas\scoop\shims;C:\Users\Thomas\AppData\Local\Microsoft\WindowsApps;C:\Program Files (x86)\Microsoft VS Code Insiders\bin;C:\Users\Thomas\AppData\Roaming\npm;C:\Users\Thomas\AppData\Local\Yarn\.bin;C:\Users\Thomas\AppData\Local\atom\bin
 
 Yarn version: 
   0.20.0
@@ -15,7 +15,7 @@ Platform:
 
 npm manifest: 
   {
-    "name": "swag",
+    "name": "swaggen",
     "version": "1.0.0",
     "description": "",
     "main": "index.js",
@@ -27,14 +27,14 @@ npm manifest:
     "author": "",
     "license": "ISC",
     "dependencies": {
-      "@types/bluebird": "^3.0.37",
+      "@types/bluebird": "^3.5.0",
       "@types/ejs": "^2.3.33",
-      "@types/lodash": "^4.14.52",
+      "@types/lodash": "^4.14.55",
       "@types/minimist": "^1.2.0",
       "@types/mkdirp": "^0.3.29",
-      "@types/node": "^7.0.4",
+      "@types/node": "^7.0.8",
       "axios": "^0.15.3",
-      "bluebird": "^3.4.7",
+      "bluebird": "^3.5.0",
       "copy": "^0.3.0",
       "ejs": "^2.5.5",
       "lodash": "^4.17.4",
@@ -52,17 +52,17 @@ Lockfile:
   # yarn lockfile v1
   
   
-  "@types/bluebird@^3.0.37":
-    version "3.0.37"
-    resolved "https://registry.yarnpkg.com/@types/bluebird/-/bluebird-3.0.37.tgz#2e76b394aa9bea40d04241a31c0887a260283388"
+  "@types/bluebird@^3.5.0":
+    version "3.5.0"
+    resolved "https://registry.yarnpkg.com/@types/bluebird/-/bluebird-3.5.0.tgz#2633470a4eabe9a47cd9a45fdb20ed5f93407bca"
   
   "@types/ejs@^2.3.33":
     version "2.3.33"
     resolved "https://registry.yarnpkg.com/@types/ejs/-/ejs-2.3.33.tgz#0a4e0a7aeee09944154b06ce5a2ac6a118f92b00"
   
-  "@types/lodash@^4.14.52":
-    version "4.14.52"
-    resolved "https://registry.yarnpkg.com/@types/lodash/-/lodash-4.14.52.tgz#de5c7ab14da1289733233c9b0ec6f9e377db90f5"
+  "@types/lodash@^4.14.55":
+    version "4.14.55"
+    resolved "https://registry.yarnpkg.com/@types/lodash/-/lodash-4.14.55.tgz#75d7d4eba020ee4103d4cbd0f2a3ef5db8f7534f"
   
   "@types/minimist@^1.2.0":
     version "1.2.0"
@@ -72,9 +72,9 @@ Lockfile:
     version "0.3.29"
     resolved "https://registry.yarnpkg.com/@types/mkdirp/-/mkdirp-0.3.29.tgz#7f2ad7ec55f914482fc9b1ec4bb1ae6028d46066"
   
-  "@types/node@^7.0.4":
-    version "7.0.5"
-    resolved "https://registry.yarnpkg.com/@types/node/-/node-7.0.5.tgz#96a0f0a618b7b606f1ec547403c00650210bfbb7"
+  "@types/node@^7.0.8":
+    version "7.0.8"
+    resolved "https://registry.yarnpkg.com/@types/node/-/node-7.0.8.tgz#25e4dd804b630c916ae671233e6d71f6ce18124a"
   
   ansi-green@^0.1.1:
     version "0.1.1"
@@ -108,9 +108,13 @@ Lockfile:
     version "0.4.2"
     resolved "https://registry.yarnpkg.com/balanced-match/-/balanced-match-0.4.2.tgz#cb3f3e3c732dc0f01ee70b403f302e61d7709838"
   
-  bluebird@^3.4.1, bluebird@^3.4.7:
+  bluebird@^3.4.1:
     version "3.4.7"
     resolved "https://registry.yarnpkg.com/bluebird/-/bluebird-3.4.7.tgz#f72d760be09b7f76d08ed8fae98b289a8d05fab3"
+  
+  bluebird@^3.5.0:
+    version "3.5.0"
+    resolved "https://registry.yarnpkg.com/bluebird/-/bluebird-3.5.0.tgz#791420d7f551eea2897453a8a77653f96606d67c"
   
   brace-expansion@^1.0.0:
     version "1.1.6"
@@ -594,4 +598,6 @@ Lockfile:
     resolved "https://registry.yarnpkg.com/xtend/-/xtend-4.0.1.tgz#a5c6d532be656e23db820efb943a1f04998d63af"
 
 Trace: 
-  Error: EPERM: operation not permitted, symlink 'C:\Users\Thomas\AppData\Local\Yarn\config\link\swag\bin\cli.js' -> 'C:\Program Files\nodejs\swag'
+  Error: getaddrinfo ENOTFOUND registry.yarnpkg.com registry.yarnpkg.com:443
+      at errnoException (dns.js:28:10)
+      at GetAddrInfoReqWrap.onlookup [as oncomplete] (dns.js:76:26)

@@ -284,15 +284,11 @@ export function getTypeReference(document: Document, schemaReference: SchemaRefe
     };
 }
 
-function getParameterSchema(parameter: OperationParameter, ...extensions: Extension[]) {
-    if(extensions.some(e => e === "x-schema")) {
-        return (parameter as any)["x-schema"] || parameter.schema || parameter;
-    }
-
-    return parameter.schema || parameter;
+function getParameterSchema(parameter: OperationParameter) {
+    return (parameter as any)["x-schema"] || parameter.schema || parameter;
 }
 
-export function getSchemas(document: Document, ...parseExtensions: Extension[]): SchemaMetadata[] {
+export function getSchemas(document: Document): SchemaMetadata[] {
     return (Object.entries(document.definitions) as ReadonlyArray<[string, Schema | undefined]>)
         .filter((x: any): x is [string, Schema] => !!x[1])
         .map<SchemaMetadata>(([schemaName, schema]) => ({
@@ -311,7 +307,7 @@ export function getSchemas(document: Document, ...parseExtensions: Extension[]):
         }));
 }
 
-export function getOperations(document: Document, ...parseExtensions: Extension[]): OperationMetadata[] {
+export function getOperations(document: Document): OperationMetadata[] {
     return flatMap(
         (Object.entries(document.paths) as ReadonlyArray<[string, Path | undefined]>)
             .filter((x: any): x is [string, Path] => !!x[1]),
@@ -331,7 +327,7 @@ export function getOperations(document: Document, ...parseExtensions: Extension[
                             required: p.required,
                             typeReference: getTypeReference(
                                 document,
-                                getParameterSchema(p, ...parseExtensions))
+                                getParameterSchema(p))
                         })),
                     responses: (Object.entries(operation.responses) as ReadonlyArray<[string, OperationResponse | undefined]>)
                         .filter((x: any): x is [string, OperationResponse] => !!x[1])

@@ -1,0 +1,22 @@
+decode<%= helpers.getTypeName(type) %> : Json.Decode.Decoder <%= helpers.getTypeName(type) %>
+decode<%= helpers.getTypeName(type) %> =
+<% if(type.kind === "schema") { -%>
+    Json.Decode.Pipeline.decode <%= helpers.getTypeName(type) %>
+<% type.properties.forEach(function(property) { -%>
+        |> Json.Decode.Pipeline.required "<%= property.name %>" (<%- helpers.getDecoder(property) %>)
+<% }) -%>
+<% } -%>
+<% if(type.kind === "alias") { -%>
+    <%= helpers.getDecoder(type.type) %> |> Json.Decode.andThen (mapAlias <%= helpers.getTypeName(type) %> >> fromResult)
+<% } -%>
+<% if(type.kind === "enum") { -%>
+    let
+        map str =
+            case str of
+            <% type.values.forEach(function(value) { -%>
+                "<%= value %>" -> Result.Ok <%= value %>
+            <% }) -%>
+                _ -> Result.Err ("Failed to decode " ++ str ++ " as <%= type.name %>")
+    in
+        Json.Decode.string |> Json.Decode.andThen (map >> fromResult)
+<% } -%>

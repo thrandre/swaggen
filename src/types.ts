@@ -1,3 +1,4 @@
+import { isPrimitive } from 'util';
 import * as Swagger from "./parsers/swagger";
 
 export interface CliFlags {
@@ -68,9 +69,11 @@ export interface Module extends IHaveName {
     getDependencies?: () => Type[];
 }
 
-export type TopLevelType = Primitive | Schema | Enum | Alias;
-export type Type = TopLevelType | Module | Response | Operation | Property;
-export type DependencyResolver = (name: string) => TopLevelType;
+export type DataType = Primitive | Schema | Enum | Alias;
+export type CustomDataType = Schema | Enum | Alias;
+export type ContainsType = Property | Parameter | Alias | Response;
+export type Type = DataType | ContainsType | Module | Response | Operation | Property | Parameter;
+export type DependencyResolver = (name: string) => DataType;
 
 export interface Emitter {
     createModules(types: Type[], createModule: (name: string, ...types: Type[]) => Module): Module[];
@@ -79,3 +82,49 @@ export interface Emitter {
 }
 
 export type Extension = "x-schema" | "x-primitive-mapping";
+
+export namespace Utils {
+    export function isPrimitive(type: Type): type is Primitive {
+        return type.kind === "primitive";
+    }
+
+    export function isOperation(type: Type): type is Operation {
+        return type.kind === "operation";
+    }
+
+    export function isSchema(type: Type): type is Schema {
+        return type.kind === "schema";
+    }
+
+    export function isAlias(type: Type): type is Alias {
+        return type.kind === "alias";
+    }
+
+    export function isEnum(type: Type): type is Enum {
+        return type.kind === "enum";
+    }
+
+    export function isProperty(type: Type): type is Property {
+        return type.kind === "property";
+    }
+
+    export function isParameter(type: Type): type is Parameter {
+        return type.kind === "parameter";
+    }
+
+    export function isResponse(type: Type): type is Response {
+        return type.kind === "response";
+    }
+    
+    export function containsType(type: Type): type is ContainsType {
+        return type.kind === "property" || type.kind === "parameter" || type.kind === "alias" || type.kind === "response";
+    }
+
+    export function isDataType(type: Type): type is DataType {
+        return type.kind === "primitive" || type.kind === "schema" || type.kind === "alias" || type.kind === "enum";
+    }
+
+    export function isCustomDataType(type: Type): type is CustomDataType {
+        return isDataType(type) && type.kind !== "primitive";
+    }
+}

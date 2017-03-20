@@ -1,0 +1,22 @@
+encode<%= helpers.getTypeName(type) %> : <%= helpers.getTypeName(type) %> -> Json.Encode.Value
+encode<%= helpers.getTypeName(type) %> x =
+<% if(type.kind === "schema") { -%>
+    Json.Encode.object [
+<% type.properties.forEach(function(property, idx) { -%>
+        ("<%= property.name %>", <%- helpers.getEncoder(property) %> (.<%= property.name %> x)) <%= idx < type.properties.length -1 ? "," : "" %>
+<% })-%>
+    ]
+<% } -%>
+<% if(type.kind === "alias") { -%>
+    let (<%= helpers.getTypeName(type) %> y) = x in <%- helpers.getEncoder(type.type) %> y
+<% } -%>
+<% if(type.kind === "enum") { -%>
+    let
+        map y =
+            case y of
+            <% type.values.forEach(function(value) { -%>
+                <%= value %> -> "<%= value %>"
+            <% }) -%>
+    in
+        Json.Encode.string (map x)
+<% } -%>

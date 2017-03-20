@@ -16,7 +16,7 @@
             "outDir": "${workspaceRoot}/bin",
             "args": [
                 "--emitter",
-                "ts",
+                "elm",
                 "--url",
                 "http://localhost:5000/swagger/v1/swagger.json",
                 "--extensions",

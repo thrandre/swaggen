@@ -1,0 +1,33 @@
+module Api exposing (..)
+
+import Json.Decode
+import Json.Encode
+import Json.Decode.Pipeline
+import Http
+import HttpBuilder
+import Date
+
+fromResult : Result String a -> Json.Decode.Decoder a
+fromResult result =
+    case result of
+        Ok val ->
+            Json.Decode.succeed val
+
+        Err error ->
+            Json.Decode.fail error
+
+mapAlias : (a -> b) -> a -> Result error b
+mapAlias factory =
+    factory >> Result.Ok
+
+decodeDate_ : Json.Decode.Decoder Date.Date
+decodeDate_ =
+    Json.Decode.string |> Json.Decode.andThen (Date.fromString >> fromResult)
+
+encodeDate_ : Date.Date -> Json.Encode.Value
+encodeDate_ date =
+    Json.Encode.string "test"
+
+encodeNullable_ : (a -> Json.Encode.Value) -> Maybe a -> Json.Encode.Value
+encodeNullable_ encoder nullable =
+    Maybe.withDefault Json.Encode.null (Maybe.andThen (encoder >> Just) nullable)

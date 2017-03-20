@@ -1,17 +1,17 @@
 import {
-    Schema,
-    Property,
-    Parameter,
-    Operation,
-    TopLevelType,
+    Alias,
+    DataType,
     DependencyResolver,
     Enum,
-    Alias,
-    Response,
-    Type,
+    Module,
+    Operation,
+    Parameter,
     Primitive,
-    Module
-} from "./types";
+    Property,
+    Response,
+    Schema,
+    Type
+} from './types';
 
 import { flatMap } from "lodash";
 import { findOrThrow, use, toMap } from "./utils";
@@ -129,7 +129,7 @@ export function createType(metadata: Swagger.EntityMetadata, dependencyResolver:
     }
 }
 
-export function getResolver<T extends Type>(pool: T[]): (name: string) => TopLevelType {
+export function getResolver<T extends Type>(pool: T[]): (name: string) => DataType {
     const validKinds = [ "primitive", "alias", "enum", "schema" ];
     
     return name => use(pool.find(n => n.name === name && validKinds.some(v => v === n.kind)))
@@ -139,7 +139,7 @@ export function getResolver<T extends Type>(pool: T[]): (name: string) => TopLev
             }
 
             return n;
-        }) as TopLevelType;
+        }) as DataType;
 }
 
 export function getSchemaDependencies(metadata: Swagger.SchemaMetadata) {
