@@ -1,146 +1,136 @@
-import { EmitterEntry } from './emitters';
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+import * as mkdirp from 'mkdirp';
+import { dirname, join, resolve as pathResolve, isAbsolute } from 'path';
 
 import { getSwaggerResponse } from "./api";
-import { writeFile } from "./fsUtils";
-
-import { Action1, createTimer, execTool, Fn1, getModuleHash, toLookup, use } from './utils';
-import * as Swagger from './parsers/swagger';
-
-import { Emitter, CliFlags, Type, Extension } from "./types";
-import { Hash, resolvePath } from "./utils";
-
-import { resolve } from "./topoUtils";
-
-import { join, dirname, resolve as res } from "path";
-import * as mkdirp from 'mkdirp';
-
-import { execFile, execFileSync, spawn } from 'child_process';
-
+import { EmitterEntry } from "./emitters";
 import Emitters from "./emitters";
-
+import { writeFile, removeDirectory } from "./fsUtils";
+import * as Swagger from './parsers/swagger';
 import {
-    createModule,
-    createType,
-    getOperationDependencies,
-    getResolver,
-    getSchemaDependencies,
-    resolveModuleDependencies
-} from './processing';
+  createModule,
+  createType,
+  getOperationDependencies,
+  getResolver,
+  getSchemaDependencies,
+  resolveModuleDependencies
+} from "./processing";
+import { resolve } from "./topoUtils";
+import { CliFlags, Emitter, Type, TypeUtils } from './types';
+import {
+  Action1,
+  createTimer,
+  execTool,
+  Fn1,
+  toLookup,
+  use
+} from "./utils";
+import { Hash, resolvePath, not } from './utils';
+import { getTypePool } from './processing';
 
-const TOPO_ROOT_NODE = "_ROOT_";
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
-const MODULES: { [key: string]: string } = {};
+function outputModules(
+  basePath: string,
+  modules: [string, string][]
+) {
+  modules.forEach(([path, content]) => {
+    const filename = join(basePath, path);
 
-function outputModules(modules: [string, string][], basePath: string, postprocess: Fn1<string, string[]> | undefined, onEmit: Action1<string>) {
-     modules.forEach(([path, content]) => {
-        const oldHash = MODULES[path];
-        const hash = getModuleHash(content);
+    mkdirp(join(basePath, dirname(path)), () => writeFile(filename, content));
+  });
+}
 
-        if(oldHash) {
-            if(oldHash === hash) {
-                return;
-            }
-        }
+async function loop(
+  emitter: { emitter: Emitter; meta: EmitterEntry },
+  [name, config]: [string, ApiConfigSchema]
+) {
+  const res = await getSwaggerResponse(config.url);
 
-        MODULES[path] = hash;
+  const operations = Swagger.getOperations(res);
+  const schemas = Swagger.getSchemas(res);
+ 
+  const typePool = getTypePool((schemas as Swagger.EntityMetadata[]).concat(operations));
 
-        const filename = join(basePath, path);
+  const modules = emitter.emitter.createModules(name, typePool, createModule);
+  const emittedModules = modules
+    .map<[string, string]>(([moduleName, module]) => [
+      moduleName,
+      emitter.emitter.emitModule(
+        module,
+        resolveModuleDependencies(module, modules.map(([_, mm]) => mm)))
+    ])
+    .filter(([_, content]) => !!content);
+  
+  return emittedModules;
+}
 
-        mkdirp.sync(join(basePath, dirname(path)));
-        writeFile(filename, content);
-
-        if(postprocess) {
-            execTool(...postprocess(filename));
-        }
-
-        onEmit(path);
+async function start(config: ConfigSchema) {
+  const emitter = getEmitter(
+    Array.isArray(config.language)
+      ? config.language[0]
+      : config.language,
+    config.language[1]);
+  
+  Object.keys(config.apis)
+    .forEach(async apiName => {
+      const modules = await loop(
+        emitter,
+        [apiName, config.apis[apiName]]);
+      
+        outputModules(config.basePath || "", modules);
     });
 }
 
-function getTypePool(entities: Swagger.EntityMetadata[]) {
-    return use(toLookup(entities, t => t.name))
-        .in(lookup => resolve({
-            root: TOPO_ROOT_NODE,
-            getChildrenFn: node => node !== TOPO_ROOT_NODE ?
-                use(lookup[node])
-                    .in(s => s ? (
-                        s.kind === "schema" ?
-                            getSchemaDependencies(s) :
-                            getOperationDependencies(s)
-                    ) : []):
-                Object.values(lookup).map(s => s.name),
-            resolveFn: (node, pool: Type[]) => use(lookup[node])
-                .in(s => createType(s || { name: node, kind: "schema" }, getResolver(pool)))
-        }));
+function getEmitter(path: string, config?: any) {
+  try {
+    const emitter = (Emitters as Hash<EmitterEntry>)[path];
+    return {
+      meta: emitter,
+      emitter: require(resolvePath(
+        (emitter && emitter.path) || path,
+        emitter ? __dirname : process.cwd()
+      ))(config)
+    };
+  } catch (err) {
+    throw new Error(`Unable to resolve emitter "${path}": ${err}`);
+  }
 }
 
-async function loop(emitter: { emitter: Emitter, meta: EmitterEntry }, url: string, basePath: string, onEmit: Action1<string>, onError: Action1<any>) {
-    let res;
+import * as fs from 'fs';
 
-    try {
-        res = await getSwaggerResponse(url);
-    }
-    catch(err) {
-        onError(`Unable to contact swagger at ${url}`);
-        return;
-    }
-
-    const operations = Swagger.getOperations(res);
-    const schemas = Swagger.getSchemas(res);
-
-    const typePool = getTypePool((schemas as Swagger.EntityMetadata[]).concat(operations));
-    
-    const modules = emitter.emitter.createModules(typePool, createModule);
-    const emittedModules = modules.map<[string, string]>(m => [
-        emitter.emitter.getModuleFilename(m),
-        emitter.emitter.emitModule(m, resolveModuleDependencies(m, modules))
-    ]);
-
-    outputModules(emittedModules, basePath, emitter.meta.postprocess, onEmit);
+interface ApiConfigSchema {
+  url: string;
 }
 
-function start(emitter: { emitter: Emitter, meta: EmitterEntry }, url: string, basePath: string) {
-    createTimer(
-        async () => {
-            await loop(
-                emitter,
-                url,
-                basePath,
-                name => console.log(`Emitted module: ${name}`),
-                (e: any) => console.error(e));
-        },
-        10000,
-        true);
+interface ConfigSchema {
+  language: string | [string, any],
+  basePath?: string;
+  apis: { [key: string]: ApiConfigSchema }
 }
 
-function getEmitter(path: string) {
-    try {
-        const emitter = (Emitters as Hash<EmitterEntry>)[path];
-        return {
-            meta: emitter,
-            emitter: require(resolvePath((emitter && emitter.path) || path, emitter ? __dirname : process.cwd()))
-        };
-    }
-    catch (err) {
-        throw new Error(`Unable to resolve emitter "${path}": ${err}`);
-    }
+async function readConfig(configPath: string) {
+  return new Promise<ConfigSchema>((res, reject) => {
+    fs.readFile(configPath, { encoding: "utf8" }, (err, data) => {
+      if(err) {
+        return reject(err);
+      }
+
+      return res(JSON.parse(data));
+    });
+  });
 }
 
-export function run(flags: CliFlags) {
-    if (!flags.url) {
-        throw new Error(`Missing required parameter "url"`);
-    }
+export async function run(flags: CliFlags) {
+  if (!flags.config) {
+    throw new Error(`Missing required parameter "config"`);
+  }
 
-    if(!flags.emitter) {
-        throw new Error(`No emitter specified. Try one of the following: ts, elm`);
-    }
+  const config = await readConfig(
+    isAbsolute(flags.config)
+      ? flags.config
+      : join(process.cwd(), flags.config));
 
-    const emitter = getEmitter(flags.emitter);
+  config.basePath = join(process.cwd(), config.basePath || "./");
 
-    start(
-        emitter,
-        flags.url,
-        flags.basePath || "./api",
-    );
+  start(config);
 }

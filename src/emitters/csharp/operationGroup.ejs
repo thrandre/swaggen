@@ -1,0 +1,12 @@
+using System.Net.Http;
+using System.Collections.Generic;
+using Swaggen.CSharp.Helpers;
+namespace <%= emitter.formatter.getNamespace(module) %>
+{
+    public static class <%= emitter.formatter.getOperationGroupName(types[0].tags[0]) %>
+    {
+<% types.forEach(function(type) { -%>
+        <%- indent(include('operation.ejs', { type, emitter }), 8) %>
+<% }) -%>
+    }
+}

@@ -1,0 +1,9 @@
+<% [...moduleDependencies.entries()].forEach(function([mod, _]) { -%>
+using <%- emitter.formatter.getNamespace(mod) %>;
+<% }) -%>
+<% if(module.types.some(t => t.kind === "operation")) { -%>
+<%- include('operationGroup.ejs', { types: module.types.filter(t => t.kind === "operation"), emitter }) %>
+<% } -%>
+<% if(module.types.some(t => t.kind !== "operation")) { -%>
+<%- include('dataType.ejs', { types: module.types.filter(t => t.kind !== "operation"), emitter }) %>
+<% } -%>

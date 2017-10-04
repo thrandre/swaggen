@@ -5,26 +5,28 @@
   "main": "index.js",
   "bin": "./bin/cli.js",
   "scripts": {
-    "build": "tsc && node_modules/.bin/copy \"src/emitters/**/*.ejs\" ./bin/emitters",
+    "build": "tsc && \"node_modules/.bin/copy\" \"src/emitters/**/*.ejs\" ./bin/emitters",
     "start": "tsc && node ./bin/cli"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@types/bluebird": "^3.5.0",
+    "@types/bluebird": "^3.5.12",
     "@types/ejs": "^2.3.33",
-    "@types/lodash": "^4.14.55",
+    "@types/lodash": "^4.14.76",
     "@types/minimist": "^1.2.0",
-    "@types/mkdirp": "^0.3.29",
-    "@types/node": "^7.0.8",
-    "axios": "^0.15.3",
+    "@types/mkdirp": "^0.5.1",
+    "@types/node": "^8.0.31",
+    "axios": "^0.16.2",
     "bluebird": "^3.5.0",
-    "copy": "^0.3.0",
-    "ejs": "^2.5.5",
-    "elm-format": "^0.5.2",
+    "copy": "^0.3.1",
+    "ejs": "^2.5.7",
+    "elm-format": "^0.6.1-alpha",
     "lodash": "^4.17.4",
     "minimist": "^1.2.0",
     "mkdirp": "^0.5.1",
-    "typescript": "^2.2.1"
+    "tslint": "^5.7.0",
+    "typescript": "^2.5.2",
+    "unibeautify-cli": "^0.1.1"
   }
 }

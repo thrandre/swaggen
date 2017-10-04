@@ -1,4 +1,4 @@
-import {
+/* import {
     Alias,
     Emitter,
     Enum,
@@ -308,3 +308,4 @@ const api: Emitter = {
 };
 
 export = api;
+ */
