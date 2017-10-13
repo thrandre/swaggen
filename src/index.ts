@@ -33,11 +33,11 @@ function outputModules(
   basePath: string,
   modules: [string, string][]
 ) {
-  modules.forEach(([path, content]) => {
-    const filename = join(basePath, path);
-
-    mkdirp(join(basePath, dirname(path)), () => writeFile(filename, content));
-  });
+  modules
+    .forEach(([path, content]) => {
+      const filename = join(basePath, path);
+      mkdirp(join(basePath, dirname(path)), () => writeFile(filename, content));
+    });
 }
 
 async function loop(
@@ -53,6 +53,7 @@ async function loop(
 
   const modules = emitter.emitter.createModules(name, typePool, createModule);
   const emittedModules = modules
+    .filter(([moduleName, module]) => module.emittable)
     .map<[string, string]>(([moduleName, module]) => [
       moduleName,
       emitter.emitter.emitModule(

@@ -68,12 +68,12 @@ export default function(config?: CSharpConfig) {
         `${parameterType} ${parameterName}${(parameter.required ? "" : " = null")}`,
       formatResponse: t => t,
       formatOptional: (name: string, type: Type) => `${name}${(TypeUtils.isPrimitive(type) ? "?" : "")}`,
-      formatArray: (name: string) => `${name}[]`
+      formatArray: (name: string) => `List<${name}>`
     }),
     formatResponse: (responseType: string, useInterface: boolean) => (useInterface ? "I" : "") + (responseType === "void" ? "ApiRequest" : `ApiRequest<${responseType}>`),
     getOperationGroupName: Common.String.pascalCase,
-    getOperationName: (operationHttpMethod: string) =>
-      Common.String.pascalCase(operationHttpMethod),
+    getOperationName: (operation: Operation) =>
+      Common.String.pascalCase(operation.method),
     getNamespace: (module: Module) => (config && config.prependNamespace && module.emittable
       ? config.prependNamespace + "."
       : "") + tee(module.name.split("."), p => (p.length > 1 ? p.slice(0, -1) : p).join(".")),

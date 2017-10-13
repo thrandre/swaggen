@@ -1,4 +1,4 @@
-public static <%- emitter.formatter.formatResponse(emitter.formatter.getTypeDefinition(type.responses[0]), true) %> <%= emitter.formatter.formatOperationName(type.method) %>(<%= type.parameters.map(p => emitter.formatter.formatParameter(emitter.formatter.getName(p), emitter.formatter.getTypeDefinition(p), p)).join(", ") %>)
+public static <%- emitter.formatter.formatResponse(emitter.formatter.getTypeDefinition(type.responses[0]), true) %> <%= emitter.formatter.getOperationName(type) %>(<%= type.parameters.map(p => emitter.formatter.formatParameter(emitter.formatter.getName(p), emitter.formatter.getTypeDefinition(p), p)).join(", ") %>)
 {
     return new <%- emitter.formatter.formatResponse(emitter.formatter.getTypeDefinition(type.responses[0])) %>($"<%= type.path %>", <%= emitter.formatter.getHttpMethod(type.method) %>)
     {
