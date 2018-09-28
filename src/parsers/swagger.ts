@@ -1,6 +1,6 @@
-import { flatMap, last } from 'lodash';
+import { flatMap, last } from "lodash";
 
-import { Hash, use } from '../utils';
+import { Hash, use } from "../utils";
 
 export interface Document {
   swagger: string;
@@ -157,6 +157,7 @@ export interface SchemaReference {
   format?: string;
   $ref?: string;
   items?: SchemaReference;
+  additionalProperties?: AdditionalPropertiesSchema;
 }
 
 export interface ArraySchemaReference extends SchemaReference {
@@ -165,6 +166,10 @@ export interface ArraySchemaReference extends SchemaReference {
 
 export interface ComplexSchemaReference extends SchemaReference {
   $ref: string;
+}
+
+export interface AdditionalPropertiesSchema {
+  type: string;
 }
 
 function resolveSchemaReference(document: Document, reference: string): string {
@@ -202,6 +207,7 @@ export type EntityMetadata = SchemaMetadata | OperationMetadata;
 
 export interface TypeMetadata {
   name: string;
+  additionalProperties?: AdditionalPropertiesSchema;
 }
 
 export interface TypeReferenceMetadata {
@@ -265,7 +271,18 @@ export const LONG: TypeMetadata = { name: "long" };
 export const FLOAT: TypeMetadata = { name: "float" };
 export const DOUBLE: TypeMetadata = { name: "double" };
 export const BOOLEAN: TypeMetadata = { name: "boolean" };
-export const OBJECT: TypeMetadata = { name: "object" };
+export const OBJECT: (
+  additionalProperties?: AdditionalPropertiesSchema
+) => TypeMetadata = (additionalProperties?: AdditionalPropertiesSchema) => {
+  const name =
+    additionalProperties && additionalProperties.type
+      ? `map_${additionalProperties.type}`
+      : "object";
+  return {
+    additionalProperties,
+    name: "object"
+  };
+};
 export const ARRAY: TypeMetadata = { name: "array" };
 
 export function getPrimitiveType(schemaReference: SchemaReference) {
@@ -285,7 +302,9 @@ export function getPrimitiveType(schemaReference: SchemaReference) {
             return PASSWORD;
           default:
             throw new Error(
-              `Unable to parse type ${schemaReference.type} with format ${schemaReference.format}`
+              `Unable to parse type ${schemaReference.type} with format ${
+                schemaReference.format
+              }`
             );
         }
       } else {
@@ -304,7 +323,9 @@ export function getPrimitiveType(schemaReference: SchemaReference) {
             return DOUBLE;
           default:
             throw new Error(
-              `Unable to parse type ${schemaReference.type} with format ${schemaReference.format}`
+              `Unable to parse type ${schemaReference.type} with format ${
+                schemaReference.format
+              }`
             );
         }
       } else {
@@ -323,7 +344,9 @@ export function getPrimitiveType(schemaReference: SchemaReference) {
             return DOUBLE;
           default:
             throw new Error(
-              `Unable to parse type ${schemaReference.type} with format ${schemaReference.format}`
+              `Unable to parse type ${schemaReference.type} with format ${
+                schemaReference.format
+              }`
             );
         }
       } else {
@@ -332,7 +355,7 @@ export function getPrimitiveType(schemaReference: SchemaReference) {
     case "boolean":
       return BOOLEAN;
     case "object":
-      return OBJECT;
+      return OBJECT(schemaReference.additionalProperties);
     case "array":
       return ARRAY;
     default:
@@ -383,15 +406,15 @@ export function getSchemas(document: Document): SchemaMetadata[] {
       name: schemaName,
       type: asPrimitiveType(schema.type),
       isLanguageSpesificType: isLanguageSpecificType(schemaName),
-      properties: Object.entries(
-        schema.properties
-      ).map(([propertyName, property]) => ({
-        name: propertyName,
-        required: schema.required
-          ? schema.required.some(r => r === propertyName)
-          : false,
-        typeReference: getTypeReference(document, property)
-      })),
+      properties: Object.entries(schema.properties).map(
+        ([propertyName, property]) => ({
+          name: propertyName,
+          required: schema.required
+            ? schema.required.some(r => r === propertyName)
+            : false,
+          typeReference: getTypeReference(document, property)
+        })
+      ),
       enum: schema.enum || []
     }));
 }

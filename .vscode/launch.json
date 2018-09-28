@@ -10,7 +10,7 @@
             "request": "launch",
             "name": "Launch Program",
             "program": "${workspaceRoot}/bin/cli.js",
-            "cwd": "C:\\Projects\\Dev\\src\\eSmart.Timeseries\\eSmart.Timeseries.ApiDefinitions\\",
+            "cwd": "C:\\Projects\\esmart\\src\\eSmart.Timeseries\\eSmart.Timeseries.ApiDefinitions\\",
             "preLaunchTask": "npm",
             "sourceMaps": true,
             "outDir": "${workspaceRoot}/bin",

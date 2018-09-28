@@ -64,19 +64,34 @@ export default function(config?: CSharpConfig) {
       formatParameterName: Common.String.camelCase,
       formatProperty: (propertyName: string, propertyType: string) =>
         `public ${propertyType} ${propertyName} { get; set; }`,
-      formatParameter: (parameterName: string, parameterType: string, parameter: Parameter) =>
-        `${parameterType} ${parameterName}${(parameter.required ? "" : " = null")}`,
+      formatParameter: (
+        parameterName: string,
+        parameterType: string,
+        parameter: Parameter
+      ) =>
+        `${parameterType} ${parameterName}${
+          parameter.required ? "" : " = null"
+        }`,
       formatResponse: t => t,
-      formatOptional: (name: string, type: Type) => `${name}${(TypeUtils.isPrimitive(type) ? "?" : "")}`,
+      formatOptional: (name: string, type: Type) =>
+        `${name}${
+          TypeUtils.isPrimitive(type) && type.name !== "string" ? "?" : ""
+        }`,
       formatArray: (name: string) => `List<${name}>`
     }),
-    formatResponse: (responseType: string, useInterface: boolean) => (useInterface ? "I" : "") + (responseType === "void" ? "ApiRequest" : `ApiRequest<${responseType}>`),
+    formatResponse: (responseType: string, useInterface: boolean) =>
+      (useInterface ? "I" : "") +
+      (responseType === "void" ? "ApiRequest" : `ApiRequest<${responseType}>`),
     getOperationGroupName: Common.String.pascalCase,
     getOperationName: (operation: Operation) =>
-      Common.String.pascalCase(operation.method),
-    getNamespace: (module: Module) => (config && config.prependNamespace && module.emittable
-      ? config.prependNamespace + "."
-      : "") + tee(module.name.split("."), p => (p.length > 1 ? p.slice(0, -1) : p).join(".")),
+      Common.String.pascalCase(operation.name),
+    getNamespace: (module: Module) =>
+      (config && config.prependNamespace && module.emittable
+        ? config.prependNamespace + "."
+        : "") +
+      tee(module.name.split("."), p =>
+        (p.length > 1 ? p.slice(0, -1) : p).join(".")
+      ),
     getHttpMethod(method: string) {
       return `HttpMethod.${Common.String.pascalCase(method)}`;
     }
@@ -98,9 +113,12 @@ export default function(config?: CSharpConfig) {
               ((t as Primitive).resolvedType = tee(
                 t as Schema,
                 t =>
-                  `Tuple<${formatter.getTypeDefinition(
-                    t.properties[0]
-                  )}, ${formatter.getTypeDefinition(t.properties[1])}>`
+                  [
+                    `Tuple<${formatter.getTypeDefinition(
+                      t.properties[0]
+                    )}, ${formatter.getTypeDefinition(t.properties[1])}>`,
+                    "System"
+                  ] as [string, string]
               ))
           );
       },
@@ -108,14 +126,19 @@ export default function(config?: CSharpConfig) {
       renameModels(types: Type[]) {
         types
           .filter(TypeUtils.isSchema)
-          .forEach(t => t.name = (t.name.toLowerCase().endsWith("model") ? t.name : `${t.name}Model`));
+          .forEach(
+            t =>
+              (t.name = t.name.toLowerCase().endsWith("model")
+                ? t.name
+                : `${t.name}Model`)
+          );
       },
 
       createSystemModules(types: Type[]) {
         return [
           ...toMap(
             Object.entries(primitiveMap).filter(([name, _]) =>
-              types.some(t => t.name === name)
+              types.some(t => t.name.toLowerCase() === name.toLowerCase())
             ),
             ([name, [systemName, systemModule]]) => systemModule,
             ([name, [systemName, systemModule]]) =>
@@ -131,7 +154,12 @@ export default function(config?: CSharpConfig) {
         return types
           .filter(TypeUtils.isDataType)
           .map(
-            t => [`${Common.String.pascalCase(apiName)}.Models.${t.name}`, [t], true] as [string, Type[], boolean]
+            t =>
+              [
+                `${Common.String.pascalCase(apiName)}.Models.${t.name}`,
+                [t],
+                true
+              ] as [string, Type[], boolean]
           );
       },
 
@@ -144,11 +172,11 @@ export default function(config?: CSharpConfig) {
           )
         ].map(
           ([moduleName, types]) =>
-            [`${Common.String.pascalCase(apiName)}.Resources.${moduleName}`, types, true] as [
-              string,
-              Type[],
-              boolean
-            ]
+            [
+              `${Common.String.pascalCase(apiName)}.Resources.${moduleName}`,
+              types,
+              true
+            ] as [string, Type[], boolean]
         );
       },
 
@@ -166,26 +194,33 @@ export default function(config?: CSharpConfig) {
 
         const systemModules = this.createSystemModules(types);
         const schemaModules = this.createSchemaModules(apiName, customTypes);
-        const operationModules = this.createOperationModules(apiName, customTypes);
+        const operationModules = this.createOperationModules(
+          apiName,
+          customTypes
+        );
 
-        return [
-          ...systemModules,
-          ...schemaModules,
-          ...operationModules
-        ].map(([moduleName, types, emittable]) =>
-          tee(
-            createModuleFn(moduleName, types, emittable),
-            m => [this.getFilename(m), m] as [string, Module]
-          )
+        return [...systemModules, ...schemaModules, ...operationModules].map(
+          ([moduleName, types, emittable]) =>
+            tee(
+              createModuleFn(moduleName, types, emittable),
+              m => [this.getFilename(m), m] as [string, Module]
+            )
         );
       },
 
-      emit(module: Module, moduleDependencies: Map<Module, Type[]>) {
+      emit(
+        apiName: string,
+        module: Module,
+        moduleDependencies: Map<Module, Type[]>
+      ) {
         return templates.module({
+          indent,
           module,
           moduleDependencies,
-          emitter: { formatter },
-          indent
+          emitter: {
+            formatter,
+            getApiName: () => Common.String.pascalCase(apiName)
+          }
         });
       }
     },

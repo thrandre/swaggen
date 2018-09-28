@@ -1,4 +1,4 @@
-import * as Fs from 'fs';
+import * as Fs from "fs";
 
 export function removeDirectory(path: string) {
   if (Fs.existsSync(path)) {

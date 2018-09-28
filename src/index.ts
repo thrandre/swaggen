@@ -1,43 +1,41 @@
-import * as mkdirp from 'mkdirp';
-import { dirname, join, resolve as pathResolve, isAbsolute } from 'path';
+import * as mkdirp from "mkdirp";
+import { dirname, join, resolve as pathResolve, isAbsolute } from "path";
 
 import { getSwaggerResponse } from "./api";
 import { EmitterEntry } from "./emitters";
 import Emitters from "./emitters";
 import { writeFile, removeDirectory } from "./fsUtils";
-import * as Swagger from './parsers/swagger';
+import * as Swagger from "./parsers/swagger";
 import {
   createModule,
   createType,
   getOperationDependencies,
   getResolver,
   getSchemaDependencies,
-  resolveModuleDependencies
+  resolveModuleDependencies,
+  getTypePool
 } from "./processing";
 import { resolve } from "./topoUtils";
-import { CliFlags, Emitter, Type, TypeUtils } from './types';
+import { CliFlags, Emitter, Type, TypeUtils } from "./types";
 import {
   Action1,
   createTimer,
   execTool,
   Fn1,
   toLookup,
-  use
+  use,
+  Hash,
+  resolvePath,
+  not
 } from "./utils";
-import { Hash, resolvePath, not } from './utils';
-import { getTypePool } from './processing';
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
-function outputModules(
-  basePath: string,
-  modules: [string, string][]
-) {
-  modules
-    .forEach(([path, content]) => {
-      const filename = join(basePath, path);
-      mkdirp(join(basePath, dirname(path)), () => writeFile(filename, content));
-    });
+function outputModules(basePath: string, modules: [string, string][]) {
+  modules.forEach(([path, content]) => {
+    const filename = join(basePath, path);
+    mkdirp(join(basePath, dirname(path)), () => writeFile(filename, content));
+  });
 }
 
 async function loop(
@@ -48,8 +46,10 @@ async function loop(
 
   const operations = Swagger.getOperations(res);
   const schemas = Swagger.getSchemas(res);
- 
-  const typePool = getTypePool((schemas as Swagger.EntityMetadata[]).concat(operations));
+
+  const typePool = getTypePool(
+    (schemas as Swagger.EntityMetadata[]).concat(operations)
+  );
 
   const modules = emitter.emitter.createModules(name, typePool, createModule);
   const emittedModules = modules
@@ -57,29 +57,26 @@ async function loop(
     .map<[string, string]>(([moduleName, module]) => [
       moduleName,
       emitter.emitter.emitModule(
+        name,
         module,
-        resolveModuleDependencies(module, modules.map(([_, mm]) => mm)))
+        resolveModuleDependencies(module, modules.map(([_, mm]) => mm))
+      )
     ])
     .filter(([_, content]) => !!content);
-  
   return emittedModules;
 }
 
-async function start(config: ConfigSchema) {
+async function start(config: ConfigSchema): Promise<void> {
   const emitter = getEmitter(
-    Array.isArray(config.language)
-      ? config.language[0]
-      : config.language,
-    config.language[1]);
-  
-  Object.keys(config.apis)
-    .forEach(async apiName => {
-      const modules = await loop(
-        emitter,
-        [apiName, config.apis[apiName]]);
-      
-        outputModules(config.basePath || "", modules);
-    });
+    Array.isArray(config.language) ? config.language[0] : config.language,
+    config.language[1]
+  );
+
+  Object.keys(config.apis).forEach(async apiName => {
+    const modules = await loop(emitter, [apiName, config.apis[apiName]]);
+
+    outputModules(config.basePath || "", modules);
+  });
 }
 
 function getEmitter(path: string, config?: any) {
@@ -97,22 +94,22 @@ function getEmitter(path: string, config?: any) {
   }
 }
 
-import * as fs from 'fs';
+import * as fs from "fs";
 
 interface ApiConfigSchema {
   url: string;
 }
 
 interface ConfigSchema {
-  language: string | [string, any],
+  language: string | [string, any];
   basePath?: string;
-  apis: { [key: string]: ApiConfigSchema }
+  apis: { [key: string]: ApiConfigSchema };
 }
 
 async function readConfig(configPath: string) {
   return new Promise<ConfigSchema>((res, reject) => {
     fs.readFile(configPath, { encoding: "utf8" }, (err, data) => {
-      if(err) {
+      if (err) {
         return reject(err);
       }
 
@@ -127,9 +124,8 @@ export async function run(flags: CliFlags) {
   }
 
   const config = await readConfig(
-    isAbsolute(flags.config)
-      ? flags.config
-      : join(process.cwd(), flags.config));
+    isAbsolute(flags.config) ? flags.config : join(process.cwd(), flags.config)
+  );
 
   config.basePath = join(process.cwd(), config.basePath || "./");
 

@@ -1,23 +1,23 @@
-import { flatMap } from 'lodash';
-import { TypeUtils, ICanBeResolvedToCustomType } from './types';
+import { flatMap } from "lodash";
+import { TypeUtils, ICanBeResolvedToCustomType } from "./types";
 
-import * as Swagger from './parsers/swagger';
+import * as Swagger from "./parsers/swagger";
 import {
-    Alias,
-    DataType,
-    DependencyResolver,
-    Enum,
-    Module,
-    Operation,
-    Parameter,
-    Primitive,
-    Property,
-    Response,
-    Schema,
-    Type
-} from './types';
-import { findOrThrow, toMap, use, toLookup } from './utils';
-import { resolve } from './topoUtils';
+  Alias,
+  DataType,
+  DependencyResolver,
+  Enum,
+  Module,
+  Operation,
+  Parameter,
+  Primitive,
+  Property,
+  Response,
+  Schema,
+  Type
+} from "./types";
+import { findOrThrow, toMap, use, toLookup } from "./utils";
+import { resolve } from "./topoUtils";
 
 function createProperty(
   metadata: Swagger.PropertyMetadata,
@@ -203,16 +203,19 @@ export function resolveModuleDependencies(module: Module, modules: Module[]) {
     .filter(t => !module.types.some(mt => mt === t))
     .filter(t => !(t as ICanBeResolvedToCustomType).resolvedType);
 
-  const customTypes = deps
-    .map(t => ({
-      type: t,
-      module: findOrThrow(modules, mt => mt.types.some(mtt => mtt === t))
-    }));
+  const customTypes = deps.map(t => ({
+    type: t,
+    module: findOrThrow(modules, mt => mt.types.some(mtt => mtt === t))
+  }));
 
   return toMap(customTypes, i => i.module, i => i.type);
 }
 
-export function createModule(name: string, types: Type[], emittable: boolean = true): Module {
+export function createModule(
+  name: string,
+  types: Type[],
+  emittable: boolean = true
+): Module {
   return {
     kind: "module",
     name,

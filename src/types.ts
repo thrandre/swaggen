@@ -26,7 +26,7 @@ export interface IHaveContainingType {
 }
 
 export interface ICanBeResolvedToCustomType {
-  resolvedType?: string;
+  resolvedType?: [string, string];
 }
 
 export interface Property
@@ -39,7 +39,7 @@ export interface Property
 
 export interface Primitive extends IHaveName, ICanBeResolvedToCustomType {
   kind: "primitive";
-  resolvedType?: string;
+  resolvedType?: [string, string];
 }
 
 export interface Schema extends IHaveName, ICanBeResolvedToCustomType {
@@ -113,7 +113,11 @@ export interface Emitter {
     types: Type[],
     createModuleFn: Fn2<string, Type[], Module>
   ): [string, Module][];
-  emitModule(module: Module, moduleDependencies: Map<Module, Type[]>): string;
+  emitModule(
+    name: string,
+    module: Module,
+    moduleDependencies: Map<Module, Type[]>
+  ): string;
 }
 
 export namespace TypeUtils {

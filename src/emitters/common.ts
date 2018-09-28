@@ -6,22 +6,28 @@ import {
   Property,
   Response,
   Type,
-  TypeUtils as TypeUtils
+  TypeUtils
 } from "../types";
 import { Fn1, Fn2, Hash, teeIf } from "../utils";
 
 import { readTemplate, resolveRelativePath, Fn3 } from "../utils";
 
 import { compile as ejs } from "ejs";
-import { Module, ContainsType } from '../types';
+import { Module, ContainsType } from "../types";
 
 export type CompiledTemplate = Fn1<{ [key: string]: any }, string>;
 
 export namespace Template {
-  export function compile<T extends {[key: string]: any}>(hash: T): { [key in keyof T]: CompiledTemplate } {
-    return Object
-      .keys(hash)
-      .reduce((prev, next) => ({...prev, [next]: ejs(readTemplate(hash[next]), { filename: hash[next] })}), {} as any);
+  export function compile<T extends { [key: string]: any }>(
+    hash: T
+  ): { [key in keyof T]: CompiledTemplate } {
+    return Object.keys(hash).reduce(
+      (prev, next) => ({
+        ...prev,
+        [next]: ejs(readTemplate(hash[next]), { filename: hash[next] })
+      }),
+      {} as any
+    );
   }
 
   export function render(
@@ -52,9 +58,9 @@ export namespace String {
 
   export function pascalCase(str: string) {
     return str
-    .split("_")
-    .map(s => s.substr(0, 1).toUpperCase() + s.substr(1))
-    .join("_");
+      .split("_")
+      .map(s => s.substr(0, 1).toUpperCase() + s.substr(1))
+      .join("_");
   }
 }
 
@@ -101,10 +107,14 @@ export namespace TypeInfo {
       formatResponse,
       formatOptional,
       formatArray,
-      
+
       getName(type: Type) {
-        if(TypeUtils.isResolvedToCustomType(type as ICanBeResolvedToCustomType)) {
-          return (type as ICanBeResolvedToCustomType).resolvedType || "";
+        if (
+          TypeUtils.isResolvedToCustomType(type as ICanBeResolvedToCustomType)
+        ) {
+          const resolvedType = (type as ICanBeResolvedToCustomType)
+            .resolvedType;
+          return resolvedType ? resolvedType[0] : "";
         }
 
         if (TypeUtils.isSchema(type)) {
@@ -135,16 +145,26 @@ export namespace TypeInfo {
       },
 
       getTypeDefinition(type: ContainsType) {
-        const formatArrayIf = (type: Type, name:string, isArray: boolean) => isArray ? formatArray(name, type) : name;
-        const formatOptionalIf = (type: Type, name: string, isOptional: boolean) => isOptional ? formatOptional(name, type) : name;
-        
+        const formatArrayIf = (type: Type, name: string, isArray: boolean) =>
+          isArray ? formatArray(name, type) : name;
+        const formatOptionalIf = (
+          type: Type,
+          name: string,
+          isOptional: boolean
+        ) => (isOptional ? formatOptional(name, type) : name);
+
         return formatOptionalIf(
           type.type,
           formatArrayIf(
             type.type,
             this.getName(type.type),
-            (type.kind === "property" || type.kind === "parameter" || type.kind === "response") && type.isArray),
-          type.kind === "parameter" && !type.required);
+            (type.kind === "property" ||
+              type.kind === "parameter" ||
+              type.kind === "response") &&
+              type.isArray
+          ),
+          type.kind === "parameter" && !type.required
+        );
       },
 
       getPropertyDefinition(property: Property) {

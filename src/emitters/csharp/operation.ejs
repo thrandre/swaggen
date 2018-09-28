@@ -1,10 +1,13 @@
-public static <%- emitter.formatter.formatResponse(emitter.formatter.getTypeDefinition(type.responses[0]), true) %> <%= emitter.formatter.getOperationName(type) %>(<%= type.parameters.map(p => emitter.formatter.formatParameter(emitter.formatter.getName(p), emitter.formatter.getTypeDefinition(p), p)).join(", ") %>)
+public static <%- emitter.formatter.formatResponse(emitter.formatter.getTypeDefinition(type.responses[0]), true) %> <%= emitter.formatter.getOperationName(type) %>(<%- type.parameters.map(p => emitter.formatter.formatParameter(emitter.formatter.getName(p), emitter.formatter.getTypeDefinition(p), p)).join(", ") %>)
 {
-    return new <%- emitter.formatter.formatResponse(emitter.formatter.getTypeDefinition(type.responses[0])) %>($"<%= type.path %>", <%= emitter.formatter.getHttpMethod(type.method) %>)
+    return new <%- emitter.formatter.formatResponse(emitter.formatter.getTypeDefinition(type.responses[0])) %>("<%- emitter.getApiName() %>", $"<%- type.path %>", <%- emitter.formatter.getHttpMethod(type.method) %>)
     {
+<% if(type.parameters.some(p => p.in === "body")) { -%>
+        Body = <%- emitter.formatter.getName(type.parameters.find(p => p.in === "body")) %>,
+<% } -%>
         Query = new Dictionary<string, object> 
         {
-            <%- indent(type.parameters.map(p => `{ "${emitter.formatter.getName(p)}", ${emitter.formatter.getName(p)} }`).join(",\r\n"), 12) %>
+            <%- indent(type.parameters.filter(p => p.in === "query").map(p => `{ "${emitter.formatter.getName(p)}", ${emitter.formatter.getName(p)} }`).join(",\r\n"), 12) %>
         }
     };
 }
