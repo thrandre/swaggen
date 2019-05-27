@@ -10,17 +10,19 @@
             "request": "launch",
             "name": "Launch Program",
             "program": "${workspaceRoot}/bin/cli.js",
-            "cwd": "${workspaceRoot}",
-            "preLaunchTask": "yarn",
+            "cwd": "C:\\Projects\\esmart\\src\\eSmart.Timeseries\\eSmart.Timeseries.ApiDefinitions\\",
+            "preLaunchTask": "npm",
             "sourceMaps": true,
             "outDir": "${workspaceRoot}/bin",
             "args": [
                 "--emitter",
-                "elm",
+                "csharp",
                 "--url",
-                "http://localhost:5000/swagger/v1/swagger.json",
+                "http://assetmodelrepository.stamp-we-dev-01.service.esmartapi.com/swagger/v1/swagger.json",
                 "--extensions",
-                "x-schema,x-primitive-mapping"
+                "x-schema,x-primitive-mapping",
+                "--config",
+                "swaggen.config.json"
             ]
         }
     ]

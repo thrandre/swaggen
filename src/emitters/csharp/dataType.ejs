@@ -1,0 +1,9 @@
+using System.Collections.Generic;
+namespace <%= emitter.formatter.getNamespace(module) %>
+{
+<% types.forEach(function(type) { -%>
+<% if(type.kind === "schema") { -%>
+    <%- indent(include('schema.ejs', { type, emitter }), 4) %>
+<% } -%>
+<% }) -%>
+}

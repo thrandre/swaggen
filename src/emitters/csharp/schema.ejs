@@ -1,0 +1,6 @@
+public class <%= emitter.formatter.getName(type) %>
+{
+<% type.properties.forEach(function(property) { -%>
+    public <%- emitter.formatter.getTypeDefinition(property) %> <%= emitter.formatter.getName(property) %> { get; set; }
+<% }) -%>
+}

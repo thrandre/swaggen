@@ -1,4 +1,4 @@
-import { HttpMethod } from '../../parsers/swagger';
+/* import { HttpMethod } from '../../parsers/swagger';
 import { ReadableOptions } from 'stream';
 import {
     Alias,
@@ -24,7 +24,7 @@ import { Extension } from "../../types";
 
 // import { groupBy } from "lodash";
 
-/*type alias Record =
+type alias Record =
     { id : Int
     , artist : RecordArtist
     , title : String
@@ -32,7 +32,7 @@ import { Extension } from "../../types";
     , genres : List String
     , location : Maybe ComplexType
     , purchasedDate : String
-    }*/
+    }
 
 function getTemplate(name: string) {
     return readTemplate(resolve(__dirname, name));
@@ -337,7 +337,7 @@ namespace Utils {
             ...Utils
         }
     });
-}*/
+}
 
 function emitHelpers() {
     return helpersTemplate({});
@@ -397,18 +397,18 @@ function createModules(types: Type[], createModule: (name: string, ...types: Typ
             "Api",
             ...types
         )
-/*        ...Object.values(
+       ...Object.values(
             groupBy(
                 (types as ReadonlyArray<Type>)
                 .filter(isOperationType), t => t.tags[0]
             )
         )
-        .map(t => createModule(t[0].tags[0], ...t)),*/
-/*        HELPER_MODULE,
+        .map(t => createModule(t[0].tags[0], ...t)),
+        HELPER_MODULE,
         use(INDEX_MODULE).in(m => {
             m.getDependencies = () => types.filter(t => isTopLevelType(t) || isOperationType(t));
             return m;
-        })*/
+        })
     ];
 }
 
@@ -451,3 +451,4 @@ const api: Emitter = {
 };
 
 export = api;
+ */
