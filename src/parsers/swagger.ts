@@ -7,7 +7,7 @@ export interface Document {
   info: Info;
   basePath: string;
   paths: Hash<Path>;
-  definitions: Hash<Schema | undefined>;
+  components: {schemas: Hash<Schema | undefined>};
 }
 
 export interface Info {
@@ -34,7 +34,7 @@ export interface Operation {
 
 export interface OperationResponse {
   description: string | undefined;
-  schema: SchemaReference;
+  content:{ "text/plain": { schema: SchemaReference } };
 }
 
 export type PropertySchema = SchemaReference;
@@ -55,7 +55,8 @@ export type Format =
   | "binary"
   | "date"
   | "date-time"
-  | "password";
+  | "password"
+  | "uuid";
 export type ParameterSource = "path" | "body" | "query";
 export type HttpMethod = "get" | "post" | "put" | "delete" | "patch";
 
@@ -97,6 +98,8 @@ function asFormat(format: string): Format {
     case "date-time":
       return format;
     case "password":
+      return format;
+    case "uuid":
       return format;
     default:
       throw new Error(`Unknown format ${format}`);
@@ -271,6 +274,7 @@ export const LONG: TypeMetadata = { name: "long" };
 export const FLOAT: TypeMetadata = { name: "float" };
 export const DOUBLE: TypeMetadata = { name: "double" };
 export const BOOLEAN: TypeMetadata = { name: "boolean" };
+export const UUID: TypeMetadata = { name: "uuid" };
 export const OBJECT: (
   additionalProperties?: AdditionalPropertiesSchema
 ) => TypeMetadata = (additionalProperties?: AdditionalPropertiesSchema) => {
@@ -300,6 +304,8 @@ export function getPrimitiveType(schemaReference: SchemaReference) {
             return DATETIME;
           case "password":
             return PASSWORD;
+          case "uuid":
+            return UUID;
           default:
             throw new Error(
               `Unable to parse type ${schemaReference.type} with format ${
@@ -397,7 +403,7 @@ function getParameterSchema(parameter: OperationParameter) {
 }
 
 export function getSchemas(document: Document): SchemaMetadata[] {
-  return (Object.entries(document.definitions) as ReadonlyArray<
+  return (Object.entries(document.components.schemas) as ReadonlyArray<
     [string, Schema | undefined]
   >)
     .filter((x: any): x is [string, Schema] => !!x[1])
@@ -433,7 +439,7 @@ export function getOperations(document: Document): OperationMetadata[] {
           kind: "operation",
           path: path,
           method: asHttpMethod(method),
-          name: operation.operationId,
+          name: operation.operationId || operation.tags[0] + "_" + method,
           tags: operation.tags,
           description: operation.summary || "",
           parameters: (operation.parameters || []).map(p => ({
@@ -450,8 +456,8 @@ export function getOperations(document: Document): OperationMetadata[] {
             .map(([responseCode, response]) => ({
               description: response.description || "",
               responseCode,
-              typeReference: response.schema
-                ? getTypeReference(document, response.schema)
+              typeReference: response.content && response.content["text/plain"] && response.content["text/plain"].schema
+                ? getTypeReference(document, response.content["text/plain"].schema)
                 : VOID_REFERENCE
             }))
         }))

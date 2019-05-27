@@ -18,7 +18,7 @@
                 "--emitter",
                 "csharp",
                 "--url",
-                "http://localhost:8833/swagger/v1/swagger.json",
+                "http://assetmodelrepository.stamp-we-dev-01.service.esmartapi.com/swagger/v1/swagger.json",
                 "--extensions",
                 "x-schema,x-primitive-mapping",
                 "--config",

@@ -1,33 +1,19 @@
 import * as mkdirp from "mkdirp";
-import { dirname, join, resolve as pathResolve, isAbsolute } from "path";
+import { dirname, join, isAbsolute } from "path";
 
 import { getSwaggerResponse } from "./api";
-import { EmitterEntry } from "./emitters";
-import Emitters from "./emitters";
-import { writeFile, removeDirectory } from "./fsUtils";
+import { default as emitters, EmitterEntry } from "./emitters";
+import { writeFile } from "./fsUtils";
 import * as Swagger from "./parsers/swagger";
 import {
   createModule,
-  createType,
-  getOperationDependencies,
-  getResolver,
-  getSchemaDependencies,
   resolveModuleDependencies,
   getTypePool
 } from "./processing";
-import { resolve } from "./topoUtils";
-import { CliFlags, Emitter, Type, TypeUtils } from "./types";
+import { CliFlags, Emitter } from "./types";
 import {
-  Action1,
-  createTimer,
-  execTool,
-  Fn1,
-  toLookup,
-  use,
   Hash,
-  resolvePath,
-  not
-} from "./utils";
+  resolvePath} from "./utils";
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
@@ -53,7 +39,7 @@ async function loop(
 
   const modules = emitter.emitter.createModules(name, typePool, createModule);
   const emittedModules = modules
-    .filter(([moduleName, module]) => module.emittable)
+    .filter(([, module]) => module.emittable)
     .map<[string, string]>(([moduleName, module]) => [
       moduleName,
       emitter.emitter.emitModule(
@@ -61,8 +47,7 @@ async function loop(
         module,
         resolveModuleDependencies(module, modules.map(([_, mm]) => mm))
       )
-    ])
-    .filter(([_, content]) => !!content);
+    ]);
   return emittedModules;
 }
 
@@ -81,7 +66,7 @@ async function start(config: ConfigSchema): Promise<void> {
 
 function getEmitter(path: string, config?: any) {
   try {
-    const emitter = (Emitters as Hash<EmitterEntry>)[path];
+    const emitter = (emitters as Hash<EmitterEntry>)[path];
     return {
       meta: emitter,
       emitter: require(resolvePath(

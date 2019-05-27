@@ -40,7 +40,8 @@ export const primitiveMap: Hash<[string, string]> = {
   binary: ["byte", "System"],
   date: ["DateTimeOffset", "System"],
   datetime: ["DateTimeOffset", "System"],
-  password: ["string", "System"]
+  password: ["string", "System"],
+  uuid: ["Guid", "System"]
 };
 
 const templates = Common.Template.compile({
@@ -107,7 +108,7 @@ export default function(config?: CSharpConfig) {
 
       handleLanguageTypes(types: Type[]) {
         types
-          .filter(t => t.name.startsWith("Tuple"))
+          .filter(t => (t.name || "").startsWith("Tuple"))
           .forEach(
             t =>
               ((t as Primitive).resolvedType = tee(
@@ -138,7 +139,7 @@ export default function(config?: CSharpConfig) {
         return [
           ...toMap(
             Object.entries(primitiveMap).filter(([name, _]) =>
-              types.some(t => t.name.toLowerCase() === name.toLowerCase())
+              types.some(t => (t.name || "").toLowerCase() === name.toLowerCase())
             ),
             ([name, [systemName, systemModule]]) => systemModule,
             ([name, [systemName, systemModule]]) =>
